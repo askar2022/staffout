@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import DashboardSidebar from './DashboardSidebar'
 
@@ -10,21 +11,24 @@ export default async function DashboardLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const db = createAdminClient()
+  const { data: profile } = await db
     .from('profiles')
-    .select('*, organizations(name)')
+    .select('organization_id, organizations(name, status)')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organization_id) {
-    redirect('/setup')
-  }
+  if (!profile?.organization_id) redirect('/setup')
 
-  const orgName = (profile?.organizations as { name: string } | null)?.name ?? 'My School'
+  const org = (profile?.organizations as unknown) as { name: string; status: string } | null
+
+  // Block pending/rejected orgs from accessing the dashboard
+  if (org?.status === 'pending') redirect('/pending')
+  if (org?.status === 'rejected') redirect('/rejected')
+
+  const orgName = org?.name ?? 'My School'
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
