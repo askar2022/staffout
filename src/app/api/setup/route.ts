@@ -1,64 +1,69 @@
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { sanitize, isValidEmail, apiError, apiOk } from '@/lib/auth'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
     const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (authError || !user) return apiError('Unauthorized', 401)
 
-    // Check if user already has an org
-    const { data: existingProfile } = await supabase
+    const body = await request.json()
+
+    const name = sanitize(body.name, 150)
+    if (!name) return apiError('School name is required')
+
+    const adminName = sanitize(body.admin_name, 100)
+    const contactEmail = sanitize(body.contact_email, 200)
+    if (contactEmail && !isValidEmail(contactEmail)) return apiError('Invalid contact email')
+
+    const db = createAdminClient()
+
+    // Prevent double setup
+    const { data: existingProfile } = await db
       .from('profiles')
       .select('organization_id')
       .eq('id', user.id)
       .single()
 
     if (existingProfile?.organization_id) {
-      return NextResponse.json({ error: 'Already set up' }, { status: 400 })
+      return apiError('This account already has a school set up', 400)
     }
 
-    const slug = body.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
 
-    // Create organization
-    const { data: org, error: orgError } = await supabase
+    const { data: org, error: orgError } = await db
       .from('organizations')
       .insert({
-        name: body.name,
+        name,
         slug: `${slug}-${Date.now()}`,
-        contact_email: body.contact_email || user.email,
-        reply_to_email: body.contact_email || user.email,
+        contact_email: contactEmail || user.email,
+        reply_to_email: contactEmail || user.email,
       })
       .select()
       .single()
 
-    if (orgError || !org) {
-      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 })
-    }
+    if (orgError || !org) return apiError('Failed to create organization', 500)
 
-    // Link user to org
-    await supabase
+    await db
       .from('profiles')
-      .update({ organization_id: org.id, full_name: body.admin_name })
+      .update({ organization_id: org.id, full_name: adminName || null })
       .eq('id', user.id)
 
-    // Add default admin recipient
-    await supabase.from('notification_recipients').insert({
+    // Add the admin as the first notification recipient
+    await db.from('notification_recipients').insert({
       organization_id: org.id,
-      name: body.admin_name || 'Administrator',
+      name: adminName || 'Administrator',
       email: user.email!,
       type: 'admin',
       receives_summary: true,
       receives_instant: true,
     })
 
-    return NextResponse.json({ success: true, org_id: org.id })
-  } catch (err) {
-    console.error('Setup error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiOk({ success: true, org_id: org.id }, 201)
+  } catch {
+    return apiError('Server error', 500)
   }
 }

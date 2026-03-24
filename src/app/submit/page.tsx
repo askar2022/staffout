@@ -1,11 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { CheckCircle, Zap, ChevronDown } from 'lucide-react'
-import type { StaffMember, SubmissionStatus } from '@/lib/types'
-import { STATUS_LABELS, REASON_LABELS } from '@/lib/types'
+import type { SubmissionStatus } from '@/lib/types'
+import { REASON_LABELS } from '@/lib/types'
 import Link from 'next/link'
+
+interface StaffOption {
+  id: string
+  full_name: string
+  campus: string | null
+  position: string | null
+}
+
+interface OrgInfo {
+  id: string
+  name: string
+}
 
 const statusOptions: { value: SubmissionStatus; label: string; color: string; desc: string }[] = [
   { value: 'absent', label: 'Absent', color: 'border-red-300 bg-red-50 text-red-800', desc: 'Not coming in today' },
@@ -16,20 +27,17 @@ const statusOptions: { value: SubmissionStatus; label: string; color: string; de
 ]
 
 export default function SubmitPage() {
-  const [orgId, setOrgId] = useState<string | null>(null)
-  const [orgName, setOrgName] = useState<string>('')
-  const [staffList, setStaffList] = useState<StaffMember[]>([])
+  const [org, setOrg] = useState<OrgInfo | null>(null)
+  const [staffList, setStaffList] = useState<StaffOption[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null)
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('')
   const [manualName, setManualName] = useState('')
   const [status, setStatus] = useState<SubmissionStatus | ''>('')
   const [expectedArrival, setExpectedArrival] = useState('')
   const [leaveTime, setLeaveTime] = useState('')
   const [reasonCategory, setReasonCategory] = useState('')
   const [notes, setNotes] = useState('')
-  const [supervisorEmail, setSupervisorEmail] = useState('')
-  const [supervisorName, setSupervisorName] = useState('')
   const [campus, setCampus] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
@@ -37,69 +45,47 @@ export default function SubmitPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    async function loadOrg() {
-      const supabase = createClient()
-      const { data: orgs } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .limit(1)
-        .single()
-
-      if (orgs) {
-        setOrgId(orgs.id)
-        setOrgName(orgs.name)
-
-        const { data: staff } = await supabase
-          .from('staff_members')
-          .select('*')
-          .eq('organization_id', orgs.id)
-          .eq('is_active', true)
-          .order('full_name')
-
-        setStaffList(staff ?? [])
-      }
-      setLoading(false)
-    }
-    loadOrg()
+    // Load org name and staff list from our own API — no direct Supabase from browser
+    fetch('/api/public/form-data')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.org) setOrg(data.org)
+        if (data.staff) setStaffList(data.staff)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  function handleStaffSelect(id: string) {
-    if (id === '__manual') {
-      setSelectedStaff(null)
-      setSupervisorEmail('')
-      setSupervisorName('')
+  function handleStaffSelect(value: string) {
+    setSelectedStaffId(value)
+    if (value && value !== '__manual') {
+      const member = staffList.find((s) => s.id === value)
+      if (member) setCampus(member.campus ?? '')
+    } else {
       setCampus('')
-      return
-    }
-    const member = staffList.find((s) => s.id === id)
-    if (member) {
-      setSelectedStaff(member)
-      setSupervisorEmail(member.supervisor_email ?? '')
-      setSupervisorName(member.supervisor_name ?? '')
-      setCampus(member.campus ?? '')
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!status || !orgId) return
+    if (!status || !org) return
 
     setSubmitting(true)
     setError('')
 
-    const staffName = selectedStaff ? selectedStaff.full_name : manualName
+    const isListed = selectedStaffId && selectedStaffId !== '__manual'
+    const staffName = isListed
+      ? staffList.find((s) => s.id === selectedStaffId)?.full_name ?? manualName
+      : manualName
 
     const res = await fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        organization_id: orgId,
+        organization_id: org.id,
+        staff_id: isListed ? selectedStaffId : null,
         staff_name: staffName,
-        staff_email: selectedStaff?.email ?? null,
-        position: selectedStaff?.position ?? null,
-        campus,
-        supervisor_email: supervisorEmail || null,
-        supervisor_name: supervisorName || null,
+        campus: campus || null,
         status,
         date: new Date().toISOString().split('T')[0],
         expected_arrival: status === 'late' ? expectedArrival : null,
@@ -119,6 +105,7 @@ export default function SubmitPage() {
   }
 
   const isAfter8AM = new Date().getHours() >= 8
+  const showManualName = !staffList.length || selectedStaffId === '__manual'
 
   if (loading) {
     return (
@@ -145,12 +132,13 @@ export default function SubmitPage() {
             onClick={() => {
               setSubmitted(false)
               setStatus('')
-              setSelectedStaff(null)
+              setSelectedStaffId('')
               setManualName('')
               setNotes('')
               setReasonCategory('')
               setExpectedArrival('')
               setLeaveTime('')
+              setCampus('')
             }}
             className="mt-6 text-sm text-indigo-600 font-medium hover:underline"
           >
@@ -170,7 +158,7 @@ export default function SubmitPage() {
             <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white/80 text-sm font-medium">{orgName || 'StaffOut'}</span>
+            <span className="text-white/80 text-sm font-medium">{org?.name || 'StaffOut'}</span>
           </div>
           <h1 className="text-2xl font-bold text-white">Report your absence</h1>
           <p className="text-indigo-200 text-sm mt-1">
@@ -195,10 +183,11 @@ export default function SubmitPage() {
             {/* Staff name */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Your name</label>
-              {staffList.length > 0 ? (
-                <div className="relative">
+              {staffList.length > 0 && (
+                <div className="relative mb-2">
                   <select
-                    required
+                    required={!showManualName}
+                    value={selectedStaffId}
                     onChange={(e) => handleStaffSelect(e.target.value)}
                     className="w-full appearance-none border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white pr-8"
                   >
@@ -212,9 +201,9 @@ export default function SubmitPage() {
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-              ) : null}
+              )}
 
-              {(!staffList.length || selectedStaff === null) && !staffList.length ? (
+              {showManualName && (
                 <input
                   type="text"
                   required
@@ -222,17 +211,6 @@ export default function SubmitPage() {
                   onChange={(e) => setManualName(e.target.value)}
                   placeholder="Enter your full name"
                   className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              ) : null}
-
-              {staffList.length > 0 && !selectedStaff && (
-                <input
-                  type="text"
-                  required={!selectedStaff}
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className="mt-2 w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               )}
             </div>
@@ -273,7 +251,7 @@ export default function SubmitPage() {
               </div>
             </div>
 
-            {/* Time fields based on status */}
+            {/* Time fields */}
             {status === 'late' && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Expected arrival time</label>
@@ -300,7 +278,7 @@ export default function SubmitPage() {
               </div>
             )}
 
-            {/* Reason category */}
+            {/* Reason */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Reason <span className="text-slate-400 font-normal">(optional)</span>
@@ -318,7 +296,7 @@ export default function SubmitPage() {
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
-              <p className="text-xs text-slate-400 mt-1">Only visible to your supervisor and admin — not in the all-staff email.</p>
+              <p className="text-xs text-slate-400 mt-1">Only visible to your supervisor and admin.</p>
             </div>
 
             {/* Notes */}
@@ -331,32 +309,17 @@ export default function SubmitPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Any additional details for your supervisor..."
                 rows={3}
+                maxLength={500}
                 className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
               <p className="text-xs text-slate-400 mt-1">Private — shared only with your supervisor and admin.</p>
             </div>
-
-            {/* Supervisor email (if not auto-filled) */}
-            {!selectedStaff?.supervisor_email && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Supervisor email <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={supervisorEmail}
-                  onChange={(e) => setSupervisorEmail(e.target.value)}
-                  placeholder="supervisor@school.org"
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            )}
           </div>
 
           <div className="px-6 pb-6">
             <button
               type="submit"
-              disabled={submitting || !status}
+              disabled={submitting || !status || (!selectedStaffId && !manualName)}
               className="w-full bg-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
             >
               {submitting

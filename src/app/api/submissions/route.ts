@@ -1,43 +1,95 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { buildInstantEmail, buildSupervisorEmail } from '@/lib/email/templates'
 import type { Submission, NotificationRecipient } from '@/lib/types'
 
-const SUMMARY_HOUR = 8 // 8 AM
+const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
+const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
+const SUMMARY_HOUR = 8
 
 function isAfterSummaryTime(): boolean {
-  const now = new Date()
-  return now.getHours() >= SUMMARY_HOUR
+  return new Date().getHours() >= SUMMARY_HOUR
 }
 
-export async function POST(request: Request) {
+// ── POST /api/submissions (public — staff submit without logging in) ──────────
+
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const supabase = await createClient()
+    const db = createAdminClient()
 
     // Validate required fields
-    if (!body.staff_name || !body.status || !body.organization_id) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const orgId = sanitize(body.organization_id, 36)
+    if (!orgId) return apiError('Missing organization')
+
+    const staffName = sanitize(body.staff_name, 100)
+    if (!staffName) return apiError('Staff name is required')
+
+    const status = sanitize(body.status, 50)
+    if (!ALLOWED_STATUSES.includes(status)) return apiError('Invalid status')
+
+    const date = sanitize(body.date, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return apiError('Invalid date format')
+
+    const reasonCategory = sanitize(body.reason_category, 50)
+    if (reasonCategory && !ALLOWED_REASONS.includes(reasonCategory)) return apiError('Invalid reason')
+
+    // Verify the org exists
+    const { data: org } = await db
+      .from('organizations')
+      .select('id, name, reply_to_email')
+      .eq('id', orgId)
+      .single()
+
+    if (!org) return apiError('Organization not found', 404)
+
+    // If a staff ID was sent, look up their supervisor server-side
+    // The client never sends supervisor emails — we retrieve them from the DB
+    let supervisorEmail: string | null = null
+    let supervisorName: string | null = null
+    let staffEmail: string | null = null
+    let position: string | null = null
+    let campus: string | null = null
+
+    const staffId = sanitize(body.staff_id, 36)
+    if (staffId) {
+      const { data: member } = await db
+        .from('staff_members')
+        .select('email, position, campus, supervisor_email, supervisor_name')
+        .eq('id', staffId)
+        .eq('organization_id', orgId)
+        .single()
+
+      if (member) {
+        staffEmail = member.email ?? null
+        position = member.position ?? null
+        campus = member.campus ?? null
+        supervisorEmail = member.supervisor_email ?? null
+        supervisorName = member.supervisor_name ?? null
+      }
     }
 
-    // Save submission
-    const { data: submission, error } = await supabase
+    // Override campus if manually set (for unlisted staff)
+    if (!campus) campus = sanitize(body.campus, 100) || null
+
+    const { data: submission, error } = await db
       .from('submissions')
       .insert({
-        organization_id: body.organization_id,
-        staff_name: body.staff_name,
-        staff_email: body.staff_email || null,
-        position: body.position || null,
-        campus: body.campus || null,
-        supervisor_email: body.supervisor_email || null,
-        supervisor_name: body.supervisor_name || null,
-        status: body.status,
-        date: body.date || new Date().toISOString().split('T')[0],
-        expected_arrival: body.expected_arrival || null,
-        leave_time: body.leave_time || null,
-        reason_category: body.reason_category || null,
-        notes: body.notes || null,
+        organization_id: orgId,
+        staff_name: staffName,
+        staff_email: staffEmail,
+        position,
+        campus,
+        supervisor_email: supervisorEmail,
+        supervisor_name: supervisorName,
+        status,
+        date,
+        expected_arrival: sanitize(body.expected_arrival, 10) || null,
+        leave_time: sanitize(body.leave_time, 10) || null,
+        reason_category: reasonCategory || null,
+        notes: sanitize(body.notes, 500) || null,
         instant_sent: false,
         summary_included: false,
       })
@@ -46,110 +98,93 @@ export async function POST(request: Request) {
 
     if (error || !submission) {
       console.error('Submission insert error:', error)
-      return NextResponse.json({ error: 'Failed to save submission' }, { status: 500 })
+      return apiError('Failed to save submission', 500)
     }
 
-    // Fetch org info for emails
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('name, reply_to_email')
-      .eq('id', body.organization_id)
-      .single()
-
-    // If after 8 AM → send instant + supervisor emails
-    if (isAfterSummaryTime() && org) {
+    // If after 8 AM → fire instant + supervisor emails
+    if (isAfterSummaryTime()) {
       const sub = submission as Submission
 
-      // Get notification recipients
-      const { data: recipients } = await supabase
+      const { data: rawRecipients } = await db
         .from('notification_recipients')
-        .select('*')
-        .eq('organization_id', body.organization_id)
+        .select('email')
+        .eq('organization_id', orgId)
         .eq('receives_instant', true)
 
-      const instantEmails =
-        (recipients as NotificationRecipient[])?.map((r) => r.email) ?? []
+      const instantEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
 
       if (instantEmails.length > 0) {
         const { subject, html, text } = buildInstantEmail(org.name, sub)
-        await sendEmail({ to: instantEmails, subject, html, text, replyTo: org.reply_to_email ?? undefined })
-
-        // Log
-        await supabase.from('email_logs').insert({
-          organization_id: body.organization_id,
-          type: 'instant',
-          recipients: instantEmails,
-          subject,
-          submission_id: submission.id,
-        })
-      }
-
-      // Supervisor alert
-      if (sub.supervisor_email) {
-        const { subject, html, text } = buildSupervisorEmail(org.name, sub)
-        await sendEmail({
-          to: [sub.supervisor_email],
+        const result = await sendEmail({
+          to: instantEmails,
           subject,
           html,
           text,
           replyTo: org.reply_to_email ?? undefined,
         })
 
-        await supabase.from('email_logs').insert({
-          organization_id: body.organization_id,
+        await db.from('email_logs').insert({
+          organization_id: orgId,
+          type: 'instant',
+          recipients: instantEmails,
+          subject,
+          submission_id: submission.id,
+          success: result.success,
+          error_message: result.success ? null : result.error,
+        })
+      }
+
+      if (supervisorEmail) {
+        const { subject, html, text } = buildSupervisorEmail(org.name, sub)
+        await sendEmail({
+          to: [supervisorEmail],
+          subject,
+          html,
+          text,
+          replyTo: org.reply_to_email ?? undefined,
+        })
+        await db.from('email_logs').insert({
+          organization_id: orgId,
           type: 'supervisor',
-          recipients: [sub.supervisor_email],
+          recipients: [supervisorEmail],
           subject,
           submission_id: submission.id,
         })
       }
 
-      // Mark instant as sent
-      await supabase
-        .from('submissions')
-        .update({ instant_sent: true })
-        .eq('id', submission.id)
+      await db.from('submissions').update({ instant_sent: true }).eq('id', submission.id)
     }
 
-    return NextResponse.json({ success: true, id: submission.id })
-  } catch (err) {
-    console.error('Submissions API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiOk({ success: true, id: submission.id }, 201)
+  } catch {
+    return apiError('Server error', 500)
   }
 }
 
-export async function GET(request: Request) {
+// ── GET /api/submissions (admin only) ────────────────────────────────────────
+
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.organization_id) {
-      return NextResponse.json({ submissions: [] })
-    }
+    const { orgId } = await requireAuth()
+    const db = createAdminClient()
 
     const url = new URL(request.url)
     const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0]
 
-    const { data: submissions } = await supabase
+    // Validate date param
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return apiError('Invalid date format')
+
+    const { data, error } = await db
       .from('submissions')
       .select('*')
-      .eq('organization_id', profile.organization_id)
+      .eq('organization_id', orgId)
       .eq('date', date)
       .order('submitted_at', { ascending: false })
 
-    return NextResponse.json({ submissions: submissions ?? [] })
+    if (error) return apiError('Failed to load submissions', 500)
+    return apiOk({ submissions: data ?? [] })
   } catch (err) {
-    console.error('GET submissions error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (err instanceof AuthError) return apiError(err.message, 401)
+    return apiError('Server error', 500)
   }
 }

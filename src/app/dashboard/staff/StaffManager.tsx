@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Plus, Pencil, Trash2, X, Check, Users } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
@@ -19,7 +18,7 @@ const EMPTY_FORM = {
   supervisor_email: '',
 }
 
-export default function StaffManager({ initialStaff, orgId }: Props) {
+export default function StaffManager({ initialStaff }: Props) {
   const [staff, setStaff] = useState<StaffMember[]>(initialStaff)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -56,45 +55,28 @@ export default function StaffManager({ initialStaff, orgId }: Props) {
 
     setSaving(true)
     setError('')
-    const supabase = createClient()
 
-    const payload = {
-      organization_id: orgId,
-      full_name: form.full_name.trim(),
-      email: form.email.trim() || null,
-      position: form.position.trim() || null,
-      campus: form.campus.trim() || null,
-      supervisor_name: form.supervisor_name.trim() || null,
-      supervisor_email: form.supervisor_email.trim() || null,
-    }
+    const method = editingId ? 'PATCH' : 'POST'
+    const url = editingId ? `/api/staff/${editingId}` : '/api/staff'
 
-    if (editingId) {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .update(payload)
-        .eq('id', editingId)
-        .select()
-        .single()
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        setStaff((prev) => prev.map((s) => (s.id === editingId ? (data as StaffMember) : s)))
-        setShowForm(false)
-      }
+    const data = await res.json()
+
+    if (!res.ok) {
+      setError(data.error || 'Failed to save')
     } else {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .insert(payload)
-        .select()
-        .single()
-
-      if (error) {
-        setError(error.message)
+      const saved = data.member as StaffMember
+      if (editingId) {
+        setStaff((prev) => prev.map((s) => (s.id === editingId ? saved : s)))
       } else {
-        setStaff((prev) => [...prev, data as StaffMember].sort((a, b) => a.full_name.localeCompare(b.full_name)))
-        setShowForm(false)
+        setStaff((prev) => [...prev, saved].sort((a, b) => a.full_name.localeCompare(b.full_name)))
       }
+      setShowForm(false)
     }
 
     setSaving(false)
@@ -102,14 +84,14 @@ export default function StaffManager({ initialStaff, orgId }: Props) {
 
   async function handleDelete(id: string) {
     if (!confirm('Remove this staff member?')) return
-    const supabase = createClient()
-    await supabase.from('staff_members').update({ is_active: false }).eq('id', id)
-    setStaff((prev) => prev.filter((s) => s.id !== id))
+    const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setStaff((prev) => prev.filter((s) => s.id !== id))
+    }
   }
 
   return (
     <div className="space-y-4">
-      {/* Add button */}
       <div className="flex justify-end">
         <button
           onClick={startAdd}
@@ -120,7 +102,6 @@ export default function StaffManager({ initialStaff, orgId }: Props) {
         </button>
       </div>
 
-      {/* Form */}
       {showForm && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -178,7 +159,6 @@ export default function StaffManager({ initialStaff, orgId }: Props) {
         </div>
       )}
 
-      {/* Staff list */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         {staff.length === 0 ? (
           <div className="p-12 text-center">
