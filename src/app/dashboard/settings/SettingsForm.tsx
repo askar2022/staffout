@@ -1,17 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, Check, Mail, Building2, Clock } from 'lucide-react'
+import { Plus, Trash2, Check, Mail, Building2, Clock, ShieldCheck } from 'lucide-react'
 import type { NotificationRecipient, Organization } from '@/lib/types'
 
 interface Props {
   org: Organization
   initialRecipients: NotificationRecipient[]
   orgId: string
-  submitToken: string
 }
 
-export default function SettingsForm({ org, initialRecipients, submitToken }: Props) {
+export default function SettingsForm({ org, initialRecipients }: Props) {
   const [orgName, setOrgName] = useState(org?.name ?? '')
   const [replyTo, setReplyTo] = useState(org?.reply_to_email ?? '')
   const [summaryTime, setSummaryTime] = useState(org?.summary_send_time ?? '08:00')
@@ -245,42 +244,58 @@ export default function SettingsForm({ org, initialRecipients, submitToken }: Pr
         </div>
       </div>
 
-      {/* Private staff submission link */}
+      {/* Email OTP info */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6">
         <div className="flex items-start justify-between gap-4 mb-2">
-          <h2 className="font-semibold text-slate-900">Private Staff Submission Link</h2>
-          <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full shrink-0">Secure</span>
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-indigo-600" />
+            Staff Verification
+          </h2>
+          <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full shrink-0">Active</span>
         </div>
-        <p className="text-sm text-slate-600 mb-1">
-          Share this link with your staff. Only people with this exact link can see your staff names and submit.
+        <p className="text-sm text-slate-600 mb-3">
+          Staff verify their identity with their <strong>work email</strong>. When they open the submission
+          form, they enter their email and receive a 6-digit code. Only staff in your directory can submit.
         </p>
-        <p className="text-xs text-red-500 mb-3 font-medium">
-          Do not post this link publicly. Treat it like a password.
-        </p>
-        {submitToken ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 bg-white border border-indigo-200 rounded-lg px-4 py-2.5">
-              <code className="text-sm text-indigo-700 flex-1 truncate">
-                {typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit?token={submitToken}
-              </code>
-              <button
-                onClick={() => navigator.clipboard?.writeText(
-                  `${window.location.origin}/submit?token=${submitToken}`
-                )}
-                className="text-xs font-semibold text-indigo-600 hover:underline shrink-0 bg-indigo-100 px-2 py-1 rounded"
-              >
-                Copy
-              </button>
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center gap-2 text-slate-700">
+            <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+              <Check className="w-3 h-3 text-green-600" />
             </div>
-            <p className="text-xs text-slate-400">
-              Without the token, the form still works but no staff names appear — strangers cannot see your team.
-            </p>
+            No passwords to remember
           </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-            Run the SQL migration to generate your secure token. See setup instructions.
+          <div className="flex items-center gap-2 text-slate-700">
+            <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+              <Check className="w-3 h-3 text-green-600" />
+            </div>
+            Only verified staff emails can submit
           </div>
-        )}
+          <div className="flex items-center gap-2 text-slate-700">
+            <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+              <Check className="w-3 h-3 text-green-600" />
+            </div>
+            Code expires in 10 minutes — secure by design
+          </div>
+        </div>
+        <div className="mt-4 bg-white border border-indigo-200 rounded-lg px-4 py-3">
+          <p className="text-xs text-slate-500 mb-1 font-medium">Staff submission link</p>
+          <div className="flex items-center gap-2">
+            <code className="text-sm text-indigo-700 flex-1 truncate">
+              {typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit
+            </code>
+            <button
+              onClick={() => navigator.clipboard?.writeText(
+                `${typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit`
+              )}
+              className="text-xs font-semibold text-indigo-600 hover:underline shrink-0 bg-indigo-100 px-2 py-1 rounded"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400 mt-2">
+          This link is safe to share — staff must verify their work email before they can submit anything.
+        </p>
       </div>
     </div>
   )

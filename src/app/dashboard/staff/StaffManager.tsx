@@ -52,6 +52,10 @@ export default function StaffManager({ initialStaff }: Props) {
       setError('Name is required')
       return
     }
+    if (!form.email.trim()) {
+      setError('Work email is required — staff use it to verify identity when submitting absences')
+      return
+    }
 
     setSaving(true)
     setError('')
@@ -117,10 +121,13 @@ export default function StaffManager({ initialStaff }: Props) {
             </div>
           )}
 
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-lg px-3 py-2 mb-3">
+            Staff use their <strong>work email</strong> to verify identity when submitting absences — no password needed.
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { key: 'full_name', label: 'Full name *', placeholder: 'Ms. Johnson', type: 'text' },
-              { key: 'email', label: 'Email', placeholder: 'name@school.org', type: 'email' },
+              { key: 'email', label: 'Work email *', placeholder: 'name@school.org', type: 'email' },
               { key: 'position', label: 'Position / Role', placeholder: 'Math Teacher', type: 'text' },
               { key: 'campus', label: 'Campus / Site', placeholder: 'Main Campus', type: 'text' },
               { key: 'supervisor_name', label: 'Supervisor name', placeholder: 'Mr. Ahmed', type: 'text' },
@@ -164,7 +171,7 @@ export default function StaffManager({ initialStaff }: Props) {
           <div className="p-12 text-center">
             <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-500 font-medium">No staff members yet</p>
-            <p className="text-slate-400 text-sm mt-1">Add your team so they can select their name in the form.</p>
+            <p className="text-slate-400 text-sm mt-1">Add your team with their work emails so they can sign in to submit absences.</p>
           </div>
         ) : (
           <table className="w-full">
