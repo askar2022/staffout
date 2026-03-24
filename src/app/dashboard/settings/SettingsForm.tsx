@@ -8,9 +8,10 @@ interface Props {
   org: Organization
   initialRecipients: NotificationRecipient[]
   orgId: string
+  submitToken: string
 }
 
-export default function SettingsForm({ org, initialRecipients }: Props) {
+export default function SettingsForm({ org, initialRecipients, submitToken }: Props) {
   const [orgName, setOrgName] = useState(org?.name ?? '')
   const [replyTo, setReplyTo] = useState(org?.reply_to_email ?? '')
   const [summaryTime, setSummaryTime] = useState(org?.summary_send_time ?? '08:00')
@@ -244,21 +245,42 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
         </div>
       </div>
 
-      {/* Share form link */}
+      {/* Private staff submission link */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6">
-        <h2 className="font-semibold text-slate-900 mb-2">Staff Submission Link</h2>
-        <p className="text-sm text-slate-600 mb-3">Share this link with your staff so they can report absences.</p>
-        <div className="flex items-center gap-2 bg-white border border-indigo-200 rounded-lg px-4 py-2.5">
-          <code className="text-sm text-indigo-700 flex-1 truncate">
-            {typeof window !== 'undefined' ? window.location.origin : 'https://your-app.vercel.app'}/submit
-          </code>
-          <button
-            onClick={() => navigator.clipboard?.writeText(window.location.origin + '/submit')}
-            className="text-xs font-medium text-indigo-600 hover:underline shrink-0"
-          >
-            Copy
-          </button>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h2 className="font-semibold text-slate-900">Private Staff Submission Link</h2>
+          <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full shrink-0">Secure</span>
         </div>
+        <p className="text-sm text-slate-600 mb-1">
+          Share this link with your staff. Only people with this exact link can see your staff names and submit.
+        </p>
+        <p className="text-xs text-red-500 mb-3 font-medium">
+          Do not post this link publicly. Treat it like a password.
+        </p>
+        {submitToken ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 bg-white border border-indigo-200 rounded-lg px-4 py-2.5">
+              <code className="text-sm text-indigo-700 flex-1 truncate">
+                {typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit?token={submitToken}
+              </code>
+              <button
+                onClick={() => navigator.clipboard?.writeText(
+                  `${window.location.origin}/submit?token=${submitToken}`
+                )}
+                className="text-xs font-semibold text-indigo-600 hover:underline shrink-0 bg-indigo-100 px-2 py-1 rounded"
+              >
+                Copy
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Without the token, the form still works but no staff names appear — strangers cannot see your team.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+            Run the SQL migration to generate your secure token. See setup instructions.
+          </div>
+        )}
       </div>
     </div>
   )

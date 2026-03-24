@@ -45,8 +45,11 @@ export default function SubmitPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // Load org name and staff list from our own API — no direct Supabase from browser
-    fetch('/api/public/form-data')
+    // Read the secret token from the URL: /submit?token=abc123
+    const token = new URLSearchParams(window.location.search).get('token') || ''
+    const url = token ? `/api/public/form-data?token=${encodeURIComponent(token)}` : '/api/public/form-data'
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.org) setOrg(data.org)

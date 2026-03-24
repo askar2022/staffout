@@ -15,10 +15,14 @@ export default async function SettingsPage() {
 
   const orgId = profile?.organization_id
 
+  const db = await import('@/lib/supabase/admin').then(m => m.createAdminClient())
+
   const [{ data: org }, { data: recipients }] = await Promise.all([
-    supabase.from('organizations').select('*').eq('id', orgId).single(),
-    supabase.from('notification_recipients').select('*').eq('organization_id', orgId).order('created_at'),
+    db.from('organizations').select('*').eq('id', orgId).single(),
+    db.from('notification_recipients').select('*').eq('organization_id', orgId).order('created_at'),
   ])
+
+  const submitToken = (org as Organization & { submit_token?: string })?.submit_token ?? ''
 
   return (
     <div className="p-8 max-w-3xl">
@@ -34,6 +38,7 @@ export default async function SettingsPage() {
         org={org as Organization}
         initialRecipients={(recipients ?? []) as NotificationRecipient[]}
         orgId={orgId ?? ''}
+        submitToken={submitToken}
       />
     </div>
   )

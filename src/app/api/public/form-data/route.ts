@@ -1,32 +1,41 @@
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError, apiOk } from '@/lib/auth'
 
 /**
- * Public endpoint — no auth required.
- * Returns ONLY what the staff submission form needs:
- *   - Organization name (for display)
- *   - Staff list (id + name + campus only — no emails, no supervisor details)
+ * Public endpoint — requires a valid submit_token.
+ * Returns ONLY what the staff submission form needs.
+ * Staff names are hidden from anyone without the correct token.
  *
- * Supervisor email is intentionally excluded from this response.
- * It gets looked up server-side when a submission is saved.
+ * Usage: GET /api/public/form-data?token=abc123
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const token = request.nextUrl.searchParams.get('token')
+
+    // No token = return nothing — form shows manual name entry only
+    if (!token) {
+      return apiOk({ org: null, staff: [] })
+    }
+
     const db = createAdminClient()
 
-    // For now we serve the first org. In multi-tenant with custom domains
-    // this would resolve org by hostname or slug from query param.
+    // Look up org by secret token only
     const { data: org } = await db
       .from('organizations')
       .select('id, name')
-      .limit(1)
+      .eq('submit_token', token)
+      .eq('status', 'approved')
       .single()
 
-    if (!org) return apiError('Organization not found', 404)
+    if (!org) {
+      // Invalid token — return empty, don't reveal why
+      return apiOk({ org: null, staff: [] })
+    }
 
     const { data: staff } = await db
       .from('staff_members')
-      .select('id, full_name, campus, position')  // no emails, no supervisor details
+      .select('id, full_name, campus, position')
       .eq('organization_id', org.id)
       .eq('is_active', true)
       .order('full_name')
