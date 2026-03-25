@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getOrgId } from '@/lib/get-org-id'
 import { format } from 'date-fns'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import type { Submission } from '@/lib/types'
@@ -11,19 +12,11 @@ export default async function SubmissionsPage({
   searchParams: Promise<{ date?: string }>
 }) {
   const params = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user!.id)
-    .single()
-
-  const orgId = profile?.organization_id
+  const orgId = await getOrgId()
+  const db = createAdminClient()
   const selectedDate = params.date || new Date().toISOString().split('T')[0]
 
-  const { data: submissions } = await supabase
+  const { data: submissions } = await db
     .from('submissions')
     .select('*')
     .eq('organization_id', orgId)

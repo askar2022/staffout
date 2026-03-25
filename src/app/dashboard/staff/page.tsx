@@ -1,21 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
-import { Users, Plus } from 'lucide-react'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getOrgId } from '@/lib/get-org-id'
+import { Users } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 import StaffManager from './StaffManager'
 
 export default async function StaffPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const orgId = await getOrgId()
+  const db = createAdminClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user!.id)
-    .single()
-
-  const orgId = profile?.organization_id
-
-  const { data: staffMembers } = await supabase
+  const { data: staffMembers } = await db
     .from('staff_members')
     .select('*')
     .eq('organization_id', orgId)

@@ -1,21 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getOrgId } from '@/lib/get-org-id'
 import { format } from 'date-fns'
 import { Mail, CheckCircle, XCircle } from 'lucide-react'
 
 export default async function EmailLogsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const orgId = await getOrgId()
+  const db = createAdminClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user!.id)
-    .single()
-
-  const { data: logs } = await supabase
+  const { data: logs } = await db
     .from('email_logs')
     .select('*')
-    .eq('organization_id', profile?.organization_id)
+    .eq('organization_id', orgId)
     .order('sent_at', { ascending: false })
     .limit(100)
 
