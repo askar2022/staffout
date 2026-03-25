@@ -7,7 +7,7 @@ import type { SubmissionStatus } from '@/lib/types'
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 
-type Step = 'email' | 'code' | 'form' | 'done'
+type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
 
 const statusOptions: {
   value: SubmissionStatus
@@ -67,6 +67,9 @@ function SubmitForm() {
   const [verifying, setVerifying] = useState(false)
   const [verifyError, setVerifyError] = useState('')
 
+  // Step 2.5 — pick (when multiple staff share the same email)
+  const [staffList, setStaffList] = useState<VerifiedStaff[]>([])
+
   // Step 3 — form
   const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null)
   const [org, setOrg] = useState<OrgInfo | null>(null)
@@ -118,9 +121,14 @@ function SubmitForm() {
     if (!res.ok) {
       setVerifyError(data.error || 'Invalid code. Try again.')
     } else {
-      setVerifiedStaff(data.staff)
       setOrg(data.org)
-      setStep('form')
+      if (data.staffList && data.staffList.length > 1) {
+        setStaffList(data.staffList)
+        setStep('pick')
+      } else {
+        setVerifiedStaff(data.staff ?? (data.staffList?.[0] ?? null))
+        setStep('form')
+      }
     }
   }
 
@@ -218,6 +226,7 @@ function SubmitForm() {
           <p className="text-indigo-200 text-sm mt-1">
             {step === 'email' && 'Enter your work email to get started'}
             {step === 'code' && 'Enter the code sent to your email'}
+            {step === 'pick' && 'Select your name to continue'}
             {step === 'form' && (isAfter8AM ? 'After 8:00 AM — instant alert will be sent' : 'Before 8:00 AM — included in morning summary')}
           </p>
         </div>
@@ -329,6 +338,43 @@ function SubmitForm() {
               </p>
             </div>
           </form>
+        )}
+
+        {/* ── Step 2.5: Who are you? ── */}
+        {step === 'pick' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6">
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
+                <ShieldCheck className="w-6 h-6 text-indigo-600" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Who are you submitting for?</h2>
+              <p className="text-slate-500 text-sm mb-5">
+                Multiple staff members share this email. Select your name.
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {staffList.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setVerifiedStaff(s)
+                      setStep('form')
+                    }}
+                    className="flex items-start gap-3 p-4 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 text-indigo-700 font-bold text-sm">
+                      {s.full_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{s.full_name}</p>
+                      {s.position && <p className="text-xs text-slate-500">{s.position}{s.campus ? ` · ${s.campus}` : ''}</p>}
+                      {s.supervisor_name && <p className="text-xs text-slate-400 mt-0.5">Supervisor: {s.supervisor_name}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── Step 3: Absence Form ── */}

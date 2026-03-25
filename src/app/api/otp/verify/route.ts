@@ -33,18 +33,19 @@ export async function POST(request: NextRequest) {
       .update({ used: true })
       .eq('id', otpRecord.id)
 
-    // Look up staff member by email
-    const { data: staffMember } = await db
+    // Look up all staff members with this email (may be multiple for demo/multi-role)
+    const { data: staffMembers } = await db
       .from('staff_members')
       .select('id, full_name, position, campus, supervisor_email, supervisor_name, organization_id')
       .eq('email', email)
       .eq('is_active', true)
-      .single()
 
     // Get org info
-    let orgInfo = null
-    const orgId = staffMember?.organization_id ?? otpRecord.organization_id
+    const orgId = (staffMembers && staffMembers.length > 0)
+      ? staffMembers[0].organization_id
+      : otpRecord.organization_id
 
+    let orgInfo = null
     if (orgId) {
       const { data: org } = await db
         .from('organizations')
@@ -55,22 +56,23 @@ export async function POST(request: NextRequest) {
       orgInfo = org
     }
 
+    const staffList = (staffMembers ?? []).map((s) => ({
+      id: s.id,
+      full_name: s.full_name,
+      position: s.position,
+      campus: s.campus,
+      supervisor_email: s.supervisor_email,
+      supervisor_name: s.supervisor_name,
+    }))
+
     return apiOk({
       verified: true,
       email,
-      staff: staffMember
-        ? {
-            id: staffMember.id,
-            full_name: staffMember.full_name,
-            position: staffMember.position,
-            campus: staffMember.campus,
-            supervisor_email: staffMember.supervisor_email,
-            supervisor_name: staffMember.supervisor_name,
-          }
-        : null,
-      org: orgInfo
-        ? { id: orgInfo.id, name: orgInfo.name }
-        : null,
+      // single staff for backward compat (first match)
+      staff: staffList.length === 1 ? staffList[0] : null,
+      // full list so the form can show a picker when there are multiple
+      staffList,
+      org: orgInfo ? { id: orgInfo.id, name: orgInfo.name } : null,
     })
   } catch {
     return apiError('Server error', 500)
