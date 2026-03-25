@@ -74,16 +74,19 @@ export function buildSummaryEmail(
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
   <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-    <!-- Header -->
-    <div style="background:#1e293b;padding:36px 32px 24px;">
-      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">
-        ${orgName} · Staff Attendance
+    <!-- Colored top accent bar -->
+    <div style="background:#4f46e5;height:5px;"></div>
+
+    <!-- Header — white, clean, readable -->
+    <div style="background:#ffffff;padding:24px 32px 16px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#4f46e5;margin-bottom:4px;">
+        StaffOut &middot; ${orgName}
       </div>
-      <div style="font-size:24px;font-weight:800;color:#ffffff;line-height:1.2;">
-        Good morning everyone,
+      <div style="font-size:20px;font-weight:800;color:#0f172a;line-height:1.3;">
+        Good morning everyone!
       </div>
-      <div style="font-size:16px;color:#94a3b8;margin-top:6px;">
-        Happy ${dayName}! Here is today's attendance update.
+      <div style="font-size:14px;color:#64748b;margin-top:3px;">
+        Happy ${dayName}, ${dateStr}
       </div>
     </div>
 
@@ -99,7 +102,7 @@ export function buildSummaryEmail(
         </div>`
           : `
         <p style="margin:0 0 20px;color:#475569;font-size:15px;">
-          The following staff members have reported changes for today:
+          Here is today's attendance update:
         </p>
         <div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;">
           ${section('Staff Out', '#dc2626', '●', absent)}
