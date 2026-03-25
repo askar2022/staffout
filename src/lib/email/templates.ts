@@ -110,7 +110,7 @@ export function buildSummaryEmail(
           ${section('Leaving Early / Off Campus', '#7c3aed', '●', leavingEarly)}
         </div>
         <p style="margin:20px 0 0;color:#64748b;font-size:13px;line-height:1.6;">
-          Each supervisor listed above has already been notified directly.
+          The supervisors of all staff listed above have already been notified directly.
         </p>`
       }
     </div>
@@ -151,7 +151,7 @@ export function buildSummaryEmail(
       leavingEarly.forEach((s) => textLines.push(`  • ${statusLine(s)}`))
       textLines.push('')
     }
-    textLines.push('Each supervisor listed above has already been notified directly.')
+    textLines.push('The supervisors of all staff listed above have already been notified directly.')
   }
 
   textLines.push(``, `— StaffOut · ${orgName}`)
