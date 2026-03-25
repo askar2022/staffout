@@ -1,13 +1,12 @@
-import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { buildSummaryEmail } from '@/lib/email/templates'
 import type { Submission } from '@/lib/types'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const { orgId } = await requireAuth(request)
+    const { orgId } = await requireAuth()
     const db = createAdminClient()
 
     const today = new Date().toISOString().split('T')[0]
