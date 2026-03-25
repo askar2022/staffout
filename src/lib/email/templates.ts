@@ -1,6 +1,16 @@
 import { Submission, STATUS_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 
+function formatCentralTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/Chicago',
+  }).format(d)
+}
+
 function statusLine(s: Submission): string {
   let detail = ''
   if (s.status === 'late' && s.expected_arrival) {
@@ -65,7 +75,7 @@ export function buildSummaryEmail(
   <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
     <!-- Header -->
-    <div style="background:#1e293b;padding:28px 32px 24px;">
+    <div style="background:#1e293b;padding:36px 32px 24px;">
       <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">
         ${orgName} · Staff Attendance
       </div>
@@ -152,7 +162,7 @@ export function buildInstantEmail(
   orgName: string,
   submission: Submission
 ): { subject: string; html: string; text: string } {
-  const timeStr = format(new Date(submission.submitted_at), 'h:mm a')
+  const timeStr = formatCentralTime(submission.submitted_at)
   const statusLabel = STATUS_LABELS[submission.status]
 
   let detail = ''
@@ -164,47 +174,69 @@ export function buildInstantEmail(
     detail = `Off campus at: <strong>${submission.leave_time}</strong>`
   }
 
-  const subject = `Staff Update — ${submission.staff_name} · ${statusLabel}`
+  const subject = `${submission.staff_name} is ${statusLabel} — ${orgName}`
+
+  // Pick header color by status
+  const headerColor =
+    submission.status === 'absent' || submission.status === 'personal_day' ? '#dc2626' :
+    submission.status === 'late' ? '#d97706' : '#4f46e5'
 
   const html = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    
-    <div style="background:#0f172a;padding:28px 32px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:4px;">Live Update · ${timeStr}</div>
-      <div style="font-size:22px;font-weight:700;color:#ffffff;">${submission.staff_name}</div>
-      <div style="margin-top:8px;display:inline-block;background:#4f46e5;color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px;">${statusLabel}</div>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+    <!-- Top label bar -->
+    <div style="background:#0f172a;padding:14px 32px 0;">
+      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">
+        StaffOut &middot; ${orgName}
+      </div>
     </div>
 
+    <!-- Main headline -->
+    <div style="background:#0f172a;padding:20px 32px 32px;">
+      <div style="font-size:26px;font-weight:800;color:#ffffff;line-height:1.25;">
+        ${submission.staff_name}<br>
+        <span style="color:${headerColor};">is ${statusLabel}</span>
+      </div>
+      <div style="margin-top:10px;font-size:13px;color:#94a3b8;">
+        Submitted at ${timeStr} &middot; ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago' })}
+      </div>
+    </div>
+
+    <!-- Details -->
     <div style="padding:28px 32px;">
       <table style="width:100%;border-collapse:collapse;">
-        ${submission.position ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;width:140px;">Position</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.position}</td></tr>` : ''}
-        ${submission.campus ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Campus / Site</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.campus}</td></tr>` : ''}
-        ${detail ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Time</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${detail}</td></tr>` : ''}
+        ${submission.position ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;width:130px;border-bottom:1px solid #f1f5f9;">Position</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${submission.position}</td></tr>` : ''}
+        ${submission.campus ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;border-bottom:1px solid #f1f5f9;">Campus</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${submission.campus}</td></tr>` : ''}
+        ${detail ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;border-bottom:1px solid #f1f5f9;">Time</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${detail}</td></tr>` : ''}
+        ${submission.notes ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:9px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
       </table>
     </div>
 
-    <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #f3f4f6;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">
-        Sent by <strong>StaffOut</strong> · ${orgName} · Submitted at ${timeStr}
+    <!-- Footer -->
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        Sent automatically by <strong style="color:#64748b;">StaffOut</strong> · Do not reply to this email.
       </p>
     </div>
+
   </div>
 </body>
 </html>`
 
   const text = [
-    `STAFF UPDATE — ${orgName}`,
+    `StaffOut · ${orgName}`,
     ``,
-    `${submission.staff_name} · ${statusLabel}`,
-    detail ? detail.replace(/<[^>]+>/g, '') : '',
+    `${submission.staff_name} is ${statusLabel}.`,
+    `Submitted at ${timeStr}`,
+    ``,
     submission.position ? `Position: ${submission.position}` : '',
     submission.campus ? `Campus: ${submission.campus}` : '',
-    ``,
-    `Submitted at ${timeStr}`,
+    detail ? detail.replace(/<[^>]+>/g, '') : '',
+    submission.notes ? `Notes: "${submission.notes}"` : '',
   ]
     .filter(Boolean)
     .join('\n')
@@ -239,7 +271,7 @@ export function buildSupervisorEmail(
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
     
-    <div style="background:${needsCoverage ? '#dc2626' : '#d97706'};padding:28px 32px;">
+    <div style="background:${needsCoverage ? '#dc2626' : '#d97706'};padding:36px 32px 28px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:4px;">
         ${needsCoverage ? 'Action Required — Supervisor Notice' : 'Supervisor Notice'}
       </div>
