@@ -95,9 +95,9 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-5">
-            No account?{' '}
+            New school?{' '}
             <Link href="/signup" className="text-indigo-600 font-medium hover:underline">
-              Create one free
+              Register your school →
             </Link>
           </p>
         </div>

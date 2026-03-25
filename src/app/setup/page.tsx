@@ -44,8 +44,8 @@ export default function SetupPage() {
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <Zap className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Set up your school</h1>
-          <p className="text-slate-500 mt-1 text-sm">This takes 2 minutes. You can change everything later.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Register Your School</h1>
+          <p className="text-slate-500 mt-1 text-sm">Fill in your school details. Your account will be reviewed and approved shortly.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
@@ -109,7 +109,7 @@ export default function SetupPage() {
               disabled={loading}
               className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 mt-2"
             >
-              {loading ? 'Setting up...' : 'Finish setup →'}
+              {loading ? 'Submitting...' : 'Submit for approval →'}
             </button>
           </form>
         </div>

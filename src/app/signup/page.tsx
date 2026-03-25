@@ -66,12 +66,12 @@ export default function SignupPage() {
             </div>
             <span className="text-2xl font-bold text-slate-900">StaffOut</span>
           </Link>
-          <p className="text-slate-500 mt-2">Create your admin account</p>
+          <p className="text-slate-500 mt-2">Register your school</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h1 className="text-xl font-bold text-slate-900 mb-1">Get started free</h1>
-          <p className="text-sm text-slate-500 mb-6">Set up your school in under 5 minutes.</p>
+          <h1 className="text-xl font-bold text-slate-900 mb-1">Register Your School</h1>
+          <p className="text-sm text-slate-500 mb-6">Create your account. Once verified you will be reviewed and approved before accessing the dashboard.</p>
 
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
@@ -137,9 +137,9 @@ export default function SignupPage() {
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-5">
-            Already have an account?{' '}
+            Already registered?{' '}
             <Link href="/login" className="text-indigo-600 font-medium hover:underline">
-              Sign in
+              Admin Sign In
             </Link>
           </p>
         </div>
