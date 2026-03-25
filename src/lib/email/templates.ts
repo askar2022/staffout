@@ -109,8 +109,8 @@ export function buildSummaryEmail(
           ${section('Late Today', '#d97706', '●', late)}
           ${section('Leaving Early / Off Campus', '#7c3aed', '●', leavingEarly)}
         </div>
-        <p style="margin:20px 0 0;color:#94a3b8;font-size:13px;">
-          Please plan your day accordingly. If coverage is needed, contact the relevant supervisor directly.
+        <p style="margin:20px 0 0;color:#64748b;font-size:13px;line-height:1.6;">
+          Each supervisor listed above has already been notified directly.
         </p>`
       }
     </div>
@@ -151,7 +151,7 @@ export function buildSummaryEmail(
       leavingEarly.forEach((s) => textLines.push(`  • ${statusLine(s)}`))
       textLines.push('')
     }
-    textLines.push('Please plan your day accordingly.')
+    textLines.push('Each supervisor listed above has already been notified directly.')
   }
 
   textLines.push(``, `— StaffOut · ${orgName}`)
