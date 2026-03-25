@@ -1,10 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { cookies } from 'next/headers'
 
 /**
  * Returns the authenticated user's org ID.
+ * If the user is a super admin with an active impersonation cookie,
+ * returns that org's ID instead of their own.
  * Throws if the request is not authenticated.
- * Use this at the top of every protected API route.
  */
 export async function requireAuth(): Promise<{ userId: string; orgId: string }> {
   const supabase = await createClient()
@@ -15,6 +17,15 @@ export async function requireAuth(): Promise<{ userId: string; orgId: string }> 
 
   if (error || !user) {
     throw new AuthError('Unauthorized')
+  }
+
+  // Super admin impersonation — use the cookie org instead of their own
+  if (user.email === process.env.SUPER_ADMIN_EMAIL) {
+    const cookieStore = await cookies()
+    const impersonateOrgId = cookieStore.get('sa_impersonate_org')?.value
+    if (impersonateOrgId) {
+      return { userId: user.id, orgId: impersonateOrgId }
+    }
   }
 
   const admin = createAdminClient()

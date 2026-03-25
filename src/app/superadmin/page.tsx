@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, Clock, Shield, Building2, Mail } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle, XCircle, Clock, Shield, Building2, Mail, LayoutDashboard } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface Org {
@@ -29,6 +30,16 @@ export default function SuperAdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleManage(orgId: string) {
+    await fetch('/api/superadmin/impersonate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ org_id: orgId }),
+    })
+    router.push('/dashboard')
+  }
 
   useEffect(() => {
     fetch('/api/superadmin')
@@ -122,6 +133,7 @@ export default function SuperAdminPage() {
                   org={org}
                   onApprove={() => handleAction(org.id, 'approved')}
                   onReject={() => handleAction(org.id, 'rejected')}
+                  onManage={() => handleManage(org.id)}
                   actionLoading={actionLoading}
                 />
               ))}
@@ -142,6 +154,7 @@ export default function SuperAdminPage() {
                   org={org}
                   onApprove={() => handleAction(org.id, 'approved')}
                   onReject={() => handleAction(org.id, 'rejected')}
+                  onManage={() => handleManage(org.id)}
                   actionLoading={actionLoading}
                 />
               ))}
@@ -164,11 +177,13 @@ function OrgCard({
   org,
   onApprove,
   onReject,
+  onManage,
   actionLoading,
 }: {
   org: Org
   onApprove: () => void
   onReject: () => void
+  onManage: () => void
   actionLoading: string | null
 }) {
   const Icon = statusIcon[org.status]
@@ -215,13 +230,22 @@ function OrgCard({
       )}
 
       {org.status === 'approved' && (
-        <button
-          onClick={onReject}
-          disabled={!!isLoading}
-          className="text-xs text-slate-400 hover:text-red-500 transition-colors"
-        >
-          Revoke
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onManage}
+            className="flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            Manage
+          </button>
+          <button
+            onClick={onReject}
+            disabled={!!isLoading}
+            className="text-xs text-slate-400 hover:text-red-500 transition-colors px-2"
+          >
+            Revoke
+          </button>
+        </div>
       )}
 
       {org.status === 'rejected' && (
