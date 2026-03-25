@@ -158,12 +158,22 @@ export function buildSummaryEmail(
 
 // ── Instant Alert ─────────────────────────────────────────────────────────────
 
+// Natural-language phrase for "Name IS ___" in the all-staff alert
+const STATUS_PHRASE: Record<string, string> = {
+  absent: 'is Absent today',
+  late: 'will Arrive Late',
+  leaving_early: 'is Leaving Early',
+  appointment: 'has an Off-Campus Appointment',
+  personal_day: 'is Out — Personal Day',
+}
+
 export function buildInstantEmail(
   orgName: string,
   submission: Submission
 ): { subject: string; html: string; text: string } {
   const timeStr = formatCentralTime(submission.submitted_at)
   const statusLabel = STATUS_LABELS[submission.status]
+  const statusPhrase = STATUS_PHRASE[submission.status] ?? `is ${statusLabel}`
 
   const subject = `Staff Update — ${orgName}`
 
@@ -203,7 +213,7 @@ export function buildInstantEmail(
       <div style="background:#f8fafc;border-left:4px solid ${statusColor};border-radius:0 10px 10px 0;padding:16px 20px;">
         <div style="font-size:17px;font-weight:700;color:#0f172a;">
           ${submission.staff_name}
-          <span style="font-weight:400;color:${statusColor};"> is ${statusLabel}</span>
+          <span style="font-weight:400;color:${statusColor};"> ${statusPhrase}</span>
         </div>
         ${timeNote ? `<div style="margin-top:6px;font-size:14px;color:#475569;">${timeNote}</div>` : ''}
       </div>
@@ -223,7 +233,7 @@ export function buildInstantEmail(
   const text = [
     `StaffOut · ${orgName}`,
     ``,
-    `${submission.staff_name} is ${statusLabel}.`,
+    `${submission.staff_name} ${statusPhrase}.`,
     timeNote || '',
     ``,
     `Submitted at ${timeStr}`,
