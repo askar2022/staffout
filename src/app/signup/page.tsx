@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Zap, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react'
+import { Zap, Mail, Lock, User, Building2, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function SignupPage() {
-  const router = useRouter()
+  const [schoolName, setSchoolName] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,8 +24,11 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/setup`,
+        data: {
+          full_name: fullName,
+          school_name: schoolName,
+        },
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/pending`,
       },
     })
 
@@ -47,10 +49,11 @@ export default function SignupPage() {
             <CheckCircle className="w-7 h-7 text-green-600" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-2">Check your email</h2>
-          <p className="text-slate-500 text-sm">
-            We sent a confirmation link to <strong>{email}</strong>. Click the link to verify your account and continue setup.
+          <p className="text-slate-500 text-sm leading-relaxed">
+            We sent a confirmation link to <strong>{email}</strong>.
+            Click the link to verify your account — your school will be reviewed and approved shortly.
           </p>
-          <p className="text-xs text-slate-400 mt-4">Check your spam folder if you don't see it.</p>
+          <p className="text-xs text-slate-400 mt-4">Check your spam folder if you don't see it within a few minutes.</p>
         </div>
       </div>
     )
@@ -66,12 +69,14 @@ export default function SignupPage() {
             </div>
             <span className="text-2xl font-bold text-slate-900">StaffOut</span>
           </Link>
-          <p className="text-slate-500 mt-2">Register your school</p>
+          <p className="text-slate-500 mt-2 text-sm">Register your school — takes 2 minutes</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <h1 className="text-xl font-bold text-slate-900 mb-1">Register Your School</h1>
-          <p className="text-sm text-slate-500 mb-6">Create your account. Once verified you will be reviewed and approved before accessing the dashboard.</p>
+          <p className="text-sm text-slate-500 mb-6">
+            Fill in your details. After confirming your email, your account will be reviewed and approved.
+          </p>
 
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
@@ -82,6 +87,21 @@ export default function SignupPage() {
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">School / Organization name</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  placeholder="e.g. Sankofa Prep Academy"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Your full name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -91,7 +111,7 @@ export default function SignupPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -106,7 +126,7 @@ export default function SignupPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@yourschool.org"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -122,7 +142,7 @@ export default function SignupPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -130,9 +150,9 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60"
+              className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 mt-2"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? 'Submitting...' : 'Register School →'}
             </button>
           </form>
 
