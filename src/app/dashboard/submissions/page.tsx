@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import type { Submission } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
+import TestSummaryButton from './TestSummaryButton'
 
 export default async function SubmissionsPage({
   searchParams,
@@ -33,7 +34,7 @@ export default async function SubmissionsPage({
 
   return (
     <div className="p-8 max-w-5xl">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-slate-500" />
@@ -41,20 +42,23 @@ export default async function SubmissionsPage({
           </h1>
           <p className="text-slate-500 text-sm mt-1">All staff absence reports</p>
         </div>
-        <form>
-          <input
-            type="date"
-            name="date"
-            defaultValue={selectedDate}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            type="submit"
-            className="ml-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Filter
-          </button>
-        </form>
+        <div className="flex flex-col sm:flex-row items-end gap-3">
+          <TestSummaryButton />
+          <form className="flex items-center gap-2">
+            <input
+              type="date"
+              name="date"
+              defaultValue={selectedDate}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Filter
+            </button>
+          </form>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">

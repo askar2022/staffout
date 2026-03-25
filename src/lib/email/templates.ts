@@ -22,100 +22,126 @@ export function buildSummaryEmail(
   submissions: Submission[],
   date: Date
 ): { subject: string; html: string; text: string } {
-  const dateStr = format(date, 'EEEE, MMMM d, yyyy')
+  const dayName = format(date, 'EEEE')       // e.g. "Tuesday"
+  const dateStr = format(date, 'MMMM d, yyyy') // e.g. "March 24, 2025"
 
   const absent = submissions.filter((s) => s.status === 'absent' || s.status === 'personal_day')
   const late = submissions.filter((s) => s.status === 'late')
   const leavingEarly = submissions.filter((s) => s.status === 'leaving_early' || s.status === 'appointment')
+  const hasAny = absent.length + late.length + leavingEarly.length > 0
 
-  const subject = `Staff Attendance Alert — ${dateStr}`
+  const subject = `Staff Attendance — ${dayName}, ${dateStr}`
 
-  const rows = (items: Submission[], label: string) => {
+  // Bullet list of names for each section
+  const bulletList = (items: Submission[]) =>
+    items
+      .map((s) => {
+        let detail = ''
+        if (s.status === 'late' && s.expected_arrival) detail = ` (arriving ${s.expected_arrival})`
+        else if (s.status === 'leaving_early' && s.leave_time) detail = ` (leaving ${s.leave_time})`
+        else if (s.status === 'appointment' && s.leave_time) detail = ` (off campus ${s.leave_time})`
+        return `<li style="margin:6px 0;font-size:15px;color:#1e293b;">${s.staff_name}${detail}</li>`
+      })
+      .join('')
+
+  const section = (title: string, color: string, dot: string, items: Submission[]) => {
     if (!items.length) return ''
     return `
-      <tr>
-        <td colspan="2" style="padding: 18px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; border-top: 1px solid #f3f4f6;">
-          ${label}
-        </td>
-      </tr>
-      ${items
-        .map(
-          (s) => `
-        <tr>
-          <td style="padding: 8px 0; font-size: 15px; color: #111827; font-weight: 500;">${s.staff_name}${s.campus ? ` <span style="color:#6b7280;font-size:13px;">(${s.campus})</span>` : ''}</td>
-          <td style="padding: 8px 0; font-size: 14px; color: #6b7280; text-align: right;">${
-            s.status === 'late' && s.expected_arrival
-              ? `Arriving ${s.expected_arrival}`
-              : s.status === 'leaving_early' && s.leave_time
-              ? `Leaving ${s.leave_time}`
-              : s.status === 'appointment' && s.leave_time
-              ? `Off campus ${s.leave_time}`
-              : STATUS_LABELS[s.status]
-          }</td>
-        </tr>`
-        )
-        .join('')}
-    `
+      <div style="margin-bottom:22px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:${color};margin-bottom:8px;">
+          ${dot}&nbsp; ${title}
+        </div>
+        <ul style="margin:0;padding-left:20px;">
+          ${bulletList(items)}
+        </ul>
+      </div>`
   }
-
-  const hasAny = absent.length + late.length + leavingEarly.length > 0
 
   const html = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    
-    <div style="background:#4f46e5;padding:28px 32px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c7d2fe;margin-bottom:4px;">Morning Attendance Summary</div>
-      <div style="font-size:22px;font-weight:700;color:#ffffff;">${orgName}</div>
-      <div style="font-size:14px;color:#a5b4fc;margin-top:4px;">${dateStr}</div>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+    <!-- Header -->
+    <div style="background:#1e293b;padding:28px 32px 24px;">
+      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">
+        ${orgName} · Staff Attendance
+      </div>
+      <div style="font-size:24px;font-weight:800;color:#ffffff;line-height:1.2;">
+        Good morning everyone,
+      </div>
+      <div style="font-size:16px;color:#94a3b8;margin-top:6px;">
+        Happy ${dayName}! Here is today's attendance update.
+      </div>
     </div>
 
+    <!-- Body -->
     <div style="padding:28px 32px;">
       ${
         !hasAny
-          ? `<p style="color:#16a34a;font-size:16px;font-weight:500;margin:0;">✓ All staff present today. No absences reported.</p>`
+          ? `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;">
+          <p style="margin:0;color:#15803d;font-size:15px;font-weight:600;">
+            ✓ All staff present today — no absences reported.
+          </p>
+        </div>`
           : `
-        <p style="color:#374151;font-size:15px;margin:0 0 20px;">The following staff members have reported changes today:</p>
-        <table style="width:100%;border-collapse:collapse;">
-          ${rows(absent, 'Absent / Personal Day')}
-          ${rows(late, 'Late Arrivals')}
-          ${rows(leavingEarly, 'Leaving Early / Off Campus')}
-        </table>
-        `
+        <p style="margin:0 0 20px;color:#475569;font-size:15px;">
+          The following staff members have reported changes for today:
+        </p>
+        <div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;">
+          ${section('Staff Out', '#dc2626', '●', absent)}
+          ${section('Late Today', '#d97706', '●', late)}
+          ${section('Leaving Early / Off Campus', '#7c3aed', '●', leavingEarly)}
+        </div>
+        <p style="margin:20px 0 0;color:#94a3b8;font-size:13px;">
+          Please plan your day accordingly. If coverage is needed, contact the relevant supervisor directly.
+        </p>`
       }
     </div>
 
-    <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #f3f4f6;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">
-        Sent by <strong>StaffOut</strong> · ${orgName} · This is an automated message.
+    <!-- Footer -->
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        Sent automatically by <strong style="color:#64748b;">StaffOut</strong> · ${dateStr} · Do not reply to this email.
       </p>
     </div>
+
   </div>
 </body>
 </html>`
 
-  const textLines = [`STAFF ATTENDANCE — ${dateStr}`, `${orgName}`, ``]
+  // Plain text version
+  const textLines = [
+    `Good morning everyone,`,
+    `Happy ${dayName}! Here is today's attendance update for ${orgName}.`,
+    ``,
+  ]
+
   if (!hasAny) {
-    textLines.push('All staff present today.')
+    textLines.push('All staff present today — no absences reported.')
   } else {
     if (absent.length) {
-      textLines.push('ABSENT / PERSONAL DAY:')
-      absent.forEach((s) => textLines.push(`  - ${statusLine(s)}`))
+      textLines.push('STAFF OUT:')
+      absent.forEach((s) => textLines.push(`  • ${statusLine(s)}`))
       textLines.push('')
     }
     if (late.length) {
-      textLines.push('LATE ARRIVALS:')
-      late.forEach((s) => textLines.push(`  - ${statusLine(s)}`))
+      textLines.push('LATE TODAY:')
+      late.forEach((s) => textLines.push(`  • ${statusLine(s)}`))
       textLines.push('')
     }
     if (leavingEarly.length) {
       textLines.push('LEAVING EARLY / OFF CAMPUS:')
-      leavingEarly.forEach((s) => textLines.push(`  - ${statusLine(s)}`))
+      leavingEarly.forEach((s) => textLines.push(`  • ${statusLine(s)}`))
+      textLines.push('')
     }
+    textLines.push('Please plan your day accordingly.')
   }
+
+  textLines.push(``, `— StaffOut · ${orgName}`)
 
   return { subject, html, text: textLines.join('\n') }
 }
