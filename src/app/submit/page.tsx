@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { SubmissionStatus } from '@/lib/types'
@@ -37,6 +37,14 @@ interface OrgInfo {
 }
 
 export default function SubmitPage() {
+  return (
+    <Suspense>
+      <SubmitForm />
+    </Suspense>
+  )
+}
+
+function SubmitForm() {
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('email')
 
