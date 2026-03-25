@@ -165,21 +165,23 @@ export function buildInstantEmail(
   const timeStr = formatCentralTime(submission.submitted_at)
   const statusLabel = STATUS_LABELS[submission.status]
 
-  let detail = ''
+  const subject = `Staff Update — ${orgName}`
+
+  // Time detail (late/leaving only — no private notes)
+  let timeNote = ''
   if (submission.status === 'late' && submission.expected_arrival) {
-    detail = `Expected arrival: <strong>${submission.expected_arrival}</strong>`
-  } else if (submission.status === 'leaving_early' && submission.leave_time) {
-    detail = `Leaving at: <strong>${submission.leave_time}</strong>`
-  } else if (submission.status === 'appointment' && submission.leave_time) {
-    detail = `Off campus at: <strong>${submission.leave_time}</strong>`
+    timeNote = `Arriving at ${submission.expected_arrival}`
+  } else if ((submission.status === 'leaving_early' || submission.status === 'appointment') && submission.leave_time) {
+    timeNote = `${submission.status === 'leaving_early' ? 'Leaving at' : 'Off campus at'} ${submission.leave_time}`
   }
 
-  const subject = `${submission.staff_name} is ${statusLabel} — ${orgName}`
-
-  // Pick header color by status
-  const headerColor =
+  const statusColor =
     submission.status === 'absent' || submission.status === 'personal_day' ? '#dc2626' :
-    submission.status === 'late' ? '#d97706' : '#4f46e5'
+    submission.status === 'late' ? '#d97706' : '#7c3aed'
+
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago',
+  })
 
   const html = `
 <!DOCTYPE html>
@@ -188,38 +190,29 @@ export function buildInstantEmail(
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
   <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-    <!-- Top label bar -->
-    <div style="background:#0f172a;padding:14px 32px 0;">
-      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">
+    <!-- Header -->
+    <div style="background:#0f172a;padding:28px 32px 24px;">
+      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;margin-bottom:16px;">
         StaffOut &middot; ${orgName}
       </div>
+      <div style="font-size:15px;color:#94a3b8;">${dateStr} &middot; ${timeStr}</div>
     </div>
 
-    <!-- Main headline -->
-    <div style="background:#0f172a;padding:20px 32px 32px;">
-      <div style="font-size:26px;font-weight:800;color:#ffffff;line-height:1.25;">
-        ${submission.staff_name}<br>
-        <span style="color:${headerColor};">is ${statusLabel}</span>
-      </div>
-      <div style="margin-top:10px;font-size:13px;color:#94a3b8;">
-        Submitted at ${timeStr} &middot; ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago' })}
-      </div>
-    </div>
-
-    <!-- Details -->
+    <!-- Body -->
     <div style="padding:28px 32px;">
-      <table style="width:100%;border-collapse:collapse;">
-        ${submission.position ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;width:130px;border-bottom:1px solid #f1f5f9;">Position</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${submission.position}</td></tr>` : ''}
-        ${submission.campus ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;border-bottom:1px solid #f1f5f9;">Campus</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${submission.campus}</td></tr>` : ''}
-        ${detail ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;border-bottom:1px solid #f1f5f9;">Time</td><td style="padding:9px 0;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">${detail}</td></tr>` : ''}
-        ${submission.notes ? `<tr><td style="padding:9px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:9px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
-      </table>
+      <div style="background:#f8fafc;border-left:4px solid ${statusColor};border-radius:0 10px 10px 0;padding:16px 20px;">
+        <div style="font-size:17px;font-weight:700;color:#0f172a;">
+          ${submission.staff_name}
+          <span style="font-weight:400;color:${statusColor};"> is ${statusLabel}</span>
+        </div>
+        ${timeNote ? `<div style="margin-top:6px;font-size:14px;color:#475569;">${timeNote}</div>` : ''}
+      </div>
     </div>
 
     <!-- Footer -->
     <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
       <p style="margin:0;font-size:12px;color:#94a3b8;">
-        Sent automatically by <strong style="color:#64748b;">StaffOut</strong> · Do not reply to this email.
+        Sent automatically by <strong style="color:#64748b;">StaffOut</strong> &middot; Do not reply to this email.
       </p>
     </div>
 
@@ -231,12 +224,9 @@ export function buildInstantEmail(
     `StaffOut · ${orgName}`,
     ``,
     `${submission.staff_name} is ${statusLabel}.`,
-    `Submitted at ${timeStr}`,
+    timeNote || '',
     ``,
-    submission.position ? `Position: ${submission.position}` : '',
-    submission.campus ? `Campus: ${submission.campus}` : '',
-    detail ? detail.replace(/<[^>]+>/g, '') : '',
-    submission.notes ? `Notes: "${submission.notes}"` : '',
+    `Submitted at ${timeStr}`,
   ]
     .filter(Boolean)
     .join('\n')
