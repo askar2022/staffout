@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { SubmissionStatus } from '@/lib/types'
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
@@ -36,12 +37,22 @@ interface OrgInfo {
 }
 
 export default function SubmitPage() {
+  const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('email')
 
   // Step 1 — email
   const [email, setEmail] = useState('')
   const [sendingCode, setSendingCode] = useState(false)
   const [sendError, setSendError] = useState('')
+
+  // If arriving from homepage with email already sent, skip to code step
+  useEffect(() => {
+    const prefilledEmail = searchParams.get('email')
+    if (prefilledEmail) {
+      setEmail(prefilledEmail)
+      setStep('code')
+    }
+  }, [searchParams])
 
   // Step 2 — OTP
   const [code, setCode] = useState('')
