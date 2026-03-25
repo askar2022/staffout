@@ -200,22 +200,27 @@ export function buildInstantEmail(
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
   <div style="max-width:540px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-    <!-- Header -->
-    <div style="background:#0f172a;padding:28px 32px 24px;">
-      <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;margin-bottom:16px;">
+    <!-- Colored top accent bar -->
+    <div style="background:${statusColor};height:5px;"></div>
+
+    <!-- Header — light background, easy to read -->
+    <div style="background:#ffffff;padding:24px 32px 16px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${statusColor};">
         StaffOut &middot; ${orgName}
       </div>
-      <div style="font-size:15px;color:#94a3b8;">${dateStr} &middot; ${timeStr}</div>
+      <div style="margin-top:4px;font-size:13px;color:#64748b;">${dateStr} &middot; ${timeStr}</div>
     </div>
 
     <!-- Body -->
     <div style="padding:28px 32px;">
-      <div style="background:#f8fafc;border-left:4px solid ${statusColor};border-radius:0 10px 10px 0;padding:16px 20px;">
-        <div style="font-size:17px;font-weight:700;color:#0f172a;">
+      <div style="background:#f8fafc;border-left:4px solid ${statusColor};border-radius:0 10px 10px 0;padding:18px 22px;">
+        <div style="font-size:18px;font-weight:800;color:#0f172a;">
           ${submission.staff_name}
-          <span style="font-weight:400;color:${statusColor};"> ${statusPhrase}</span>
         </div>
-        ${timeNote ? `<div style="margin-top:6px;font-size:14px;color:#475569;">${timeNote}</div>` : ''}
+        <div style="margin-top:4px;font-size:16px;font-weight:500;color:${statusColor};">
+          ${statusPhrase}
+        </div>
+        ${timeNote ? `<div style="margin-top:8px;font-size:14px;color:#475569;font-weight:500;">${timeNote}</div>` : ''}
       </div>
     </div>
 
