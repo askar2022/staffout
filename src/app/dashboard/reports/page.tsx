@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, Fragment } from 'react'
 import { FileText, Search, Download, Printer, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -247,9 +247,8 @@ export default function ReportsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {staff.map((s) => (
-                    <>
+                    <Fragment key={s.name}>
                       <tr
-                        key={s.name}
                         className="hover:bg-slate-50 cursor-pointer transition-colors"
                         onClick={() => setExpandedName(expandedName === s.name ? null : s.name)}
                       >
@@ -283,7 +282,7 @@ export default function ReportsPage() {
 
                       {/* Expanded detail rows */}
                       {expandedName === s.name && (
-                        <tr key={`${s.name}-detail`}>
+                        <tr>
                           <td colSpan={7} className="px-5 py-3 bg-slate-50 border-b border-slate-200">
                             <div className="flex flex-wrap gap-2">
                               {s.dates.map((d, i) => (
@@ -299,7 +298,7 @@ export default function ReportsPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
