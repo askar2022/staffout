@@ -84,10 +84,19 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
   }
 
   const typeLabels: Record<string, string> = {
-    all_staff: 'All Staff',
     admin: 'Admin',
+    leadership: 'Leadership',
+    all_staff: 'All Staff',
     reception: 'Reception',
     hr: 'HR',
+  }
+
+  const typeBadgeColor: Record<string, string> = {
+    admin: 'bg-indigo-100 text-indigo-700',
+    leadership: 'bg-purple-100 text-purple-700',
+    all_staff: 'bg-slate-100 text-slate-600',
+    reception: 'bg-teal-100 text-teal-700',
+    hr: 'bg-pink-100 text-pink-700',
   }
 
   return (
@@ -157,7 +166,7 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
           <Mail className="w-4 h-4 text-slate-500" />
           Notification Recipients
         </h2>
-        <p className="text-sm text-slate-500 mb-5">Who receives the morning summary and instant alerts.</p>
+        <p className="text-sm text-slate-500 mb-5">Admin gets everything. Leadership gets the Friday weekly report only. All Staff gets 8 AM + instant alerts.</p>
 
         <div className="space-y-2 mb-4">
           {recipients.map((r) => (
@@ -166,7 +175,7 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
                 <p className="text-sm font-medium text-slate-900 truncate">{r.name}</p>
                 <p className="text-xs text-slate-500 truncate">{r.email}</p>
               </div>
-              <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadgeColor[r.type] ?? 'bg-slate-100 text-slate-600'}`}>
                 {typeLabels[r.type] ?? r.type}
               </span>
               <div className="flex gap-1.5 text-xs shrink-0">
@@ -227,12 +236,11 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
               onChange={(e) => setNewRecipient((p) => ({ ...p, type: e.target.value as 'admin' }))}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
-              <option value="admin">Admin (Summary + Instant)</option>
-              <option value="summary">Summary only (8 AM + Weekly report)</option>
-              <option value="instant">Instant only (during-day alerts)</option>
-              <option value="all_staff">All Staff</option>
-              <option value="reception">Reception</option>
-              <option value="hr">HR</option>
+              <option value="admin">Admin — gets everything</option>
+              <option value="leadership">Leadership — Friday weekly report only</option>
+              <option value="all_staff">All Staff — 8 AM summary + instant alerts</option>
+              <option value="reception">Reception — 8 AM summary + instant alerts</option>
+              <option value="hr">HR — 8 AM summary + instant alerts</option>
             </select>
           </div>
           <button

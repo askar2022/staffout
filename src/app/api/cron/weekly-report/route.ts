@@ -51,12 +51,12 @@ export async function GET(request: Request) {
 
       const submissions = (rawSubs ?? []) as Submission[]
 
-      // Get summary recipients
+      // Weekly report goes to admin + leadership only
       const { data: rawRecipients } = await db
         .from('notification_recipients')
-        .select('email')
+        .select('email, type')
         .eq('organization_id', org.id)
-        .eq('receives_summary', true)
+        .in('type', ['admin', 'leadership'])
 
       const summaryEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
 

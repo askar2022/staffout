@@ -2,7 +2,14 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 
-const ALLOWED_TYPES = ['all_staff', 'admin', 'reception', 'hr']
+const ALLOWED_TYPES = ['all_staff', 'admin', 'leadership', 'reception', 'hr']
+
+// What each type receives
+function flagsForType(type: string) {
+  if (type === 'leadership') return { receives_summary: false, receives_instant: false }
+  if (type === 'all_staff')  return { receives_summary: true,  receives_instant: true  }
+  return { receives_summary: true, receives_instant: true } // admin, reception, hr
+}
 
 export async function GET() {
   try {
@@ -38,6 +45,7 @@ export async function POST(request: NextRequest) {
     if (!ALLOWED_TYPES.includes(type)) return apiError('Invalid recipient type')
 
     const db = createAdminClient()
+    const flags = flagsForType(type)
     const { data, error } = await db
       .from('notification_recipients')
       .insert({
@@ -45,8 +53,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         type,
-        receives_summary: true,
-        receives_instant: true,
+        ...flags,
       })
       .select('id, name, email, type, receives_summary, receives_instant')
       .single()
