@@ -218,9 +218,10 @@ function SubmitForm() {
             <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white/80 text-sm font-medium">
-              {org?.name ?? 'StaffOut'}
-            </span>
+            <span className="text-white font-bold text-sm tracking-wide">Absence</span>
+            {org?.name && (
+              <span className="text-white/60 text-sm">· {org.name}</span>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-white">Report your absence</h1>
           <p className="text-indigo-200 text-sm mt-1">

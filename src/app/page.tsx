@@ -43,7 +43,7 @@ export default function HomePage() {
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="text-2xl font-bold text-white">StaffOut</span>
+          <span className="text-2xl font-bold text-white">Absence</span>
         </div>
 
         {/* Card */}

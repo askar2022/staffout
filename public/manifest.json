@@ -1,10 +1,10 @@
 {
-  "name": "StaffOut",
-  "short_name": "StaffOut",
-  "description": "Staff attendance alerts for schools",
+  "name": "Absence",
+  "short_name": "Absence",
+  "description": "Report your absence quickly and easily",
   "start_url": "/submit",
   "display": "standalone",
-  "background_color": "#f8fafc",
+  "background_color": "#4f46e5",
   "theme_color": "#4f46e5",
   "orientation": "portrait",
   "icons": [
