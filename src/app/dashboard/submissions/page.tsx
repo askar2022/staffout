@@ -5,6 +5,7 @@ import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import type { Submission } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 import TestSummaryButton from './TestSummaryButton'
+import TestWeeklyReportButton from './TestWeeklyReportButton'
 
 export default async function SubmissionsPage({
   searchParams,
@@ -36,6 +37,7 @@ export default async function SubmissionsPage({
           <p className="text-slate-500 text-sm mt-1">All staff absence reports</p>
         </div>
         <div className="flex flex-col sm:flex-row items-end gap-3">
+          <TestWeeklyReportButton />
           <TestSummaryButton />
           <form className="flex items-center gap-2">
             <input
