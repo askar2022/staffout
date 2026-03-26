@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const submissions = (data ?? []) as Submission[]
 
     // Group by staff name → count by type
-    const byStaff: Record<string, {
+    interface StaffEntry {
       name: string
       absent: number
       late: number
@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
       personal_day: number
       total: number
       dates: { date: string; status: string }[]
-    }> = {}
+    }
+
+    const byStaff: Record<string, StaffEntry> = {}
 
     for (const s of submissions) {
       if (!byStaff[s.staff_name]) {
@@ -53,7 +55,8 @@ export async function GET(request: NextRequest) {
         }
       }
       const entry = byStaff[s.staff_name]
-      entry[s.status as keyof typeof entry] = (entry[s.status as keyof typeof entry] as number) + 1
+      const statusKey = s.status as 'absent' | 'late' | 'leaving_early' | 'appointment' | 'personal_day'
+      if (statusKey in entry) entry[statusKey]++
       entry.total++
       entry.dates.push({ date: s.date, status: s.status })
     }
