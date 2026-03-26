@@ -12,12 +12,14 @@ import {
   Mail,
   LogOut,
   ExternalLink,
+  BarChart2,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/submissions', label: 'Submissions', icon: ClipboardList },
   { href: '/dashboard/staff', label: 'Staff Directory', icon: Users },
+  { href: '/dashboard/reports', label: 'Reports', icon: BarChart2 },
   { href: '/dashboard/email-logs', label: 'Email Logs', icon: Mail },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
