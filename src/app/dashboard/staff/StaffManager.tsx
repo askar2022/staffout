@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
 interface Props {
@@ -203,13 +203,6 @@ export default function StaffManager({ initialStaff }: Props) {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Permanently delete this staff member? This cannot be undone.')) return
-    const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      setStaff((prev) => prev.filter((s) => s.id !== id))
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -241,17 +234,6 @@ export default function StaffManager({ initialStaff }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${
-              showArchived
-                ? 'bg-amber-50 border-amber-300 text-amber-700'
-                : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Archive className="w-4 h-4" />
-            {showArchived ? `Archived (${archivedStaff.length})` : `Show Archived${archivedStaff.length > 0 ? ` (${archivedStaff.length})` : ''}`}
-          </button>
           {!showArchived && (
             <button
               onClick={startAdd}
@@ -338,7 +320,33 @@ export default function StaffManager({ initialStaff }: Props) {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 bg-white rounded-t-2xl overflow-hidden border border-b-0">
+        <button
+          onClick={() => setShowArchived(false)}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            !showArchived
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Active Staff ({activeStaff.length})
+        </button>
+        <button
+          onClick={() => setShowArchived(true)}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            showArchived
+              ? 'border-amber-500 text-amber-600 bg-amber-50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Archive className="w-4 h-4" />
+          Archived ({archivedStaff.length})
+        </button>
+      </div>
+
+      <div className="bg-white rounded-b-2xl border border-slate-200 border-t-0 overflow-hidden">
         {staff.length === 0 ? (
           <div className="p-12 text-center">
             <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -388,22 +396,14 @@ export default function StaffManager({ initialStaff }: Props) {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1 justify-end">
                       {showArchived ? (
-                        <>
-                          <button
-                            onClick={() => handleRestore(member.id)}
-                            title="Restore"
-                            className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(member.id)}
-                            title="Delete permanently"
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleRestore(member.id)}
+                          title="Restore to active"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Restore
+                        </button>
                       ) : (
                         <>
                           <button
