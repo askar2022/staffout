@@ -42,13 +42,38 @@ export async function POST(request: NextRequest) {
       return apiError('No valid rows found — make sure Name and Email columns are filled')
     }
 
-    // Upsert on email+org so re-importing updates existing staff
-    const { data, error } = await db
+    // Get existing emails for this org to avoid duplicates
+    const { data: existing } = await db
       .from('staff_members')
-      .upsert(records, { onConflict: 'organization_id,email', ignoreDuplicates: false })
-      .select('id')
+      .select('id, email')
+      .eq('organization_id', orgId)
 
-    if (error) return apiError('Import failed: ' + error.message, 500)
+    const existingMap = new Map((existing ?? []).map((e) => [e.email.toLowerCase(), e.id]))
+
+    // Split into inserts and updates
+    const toInsert = records.filter((r) => !existingMap.has(r.email))
+    const toUpdate = records.filter((r) => existingMap.has(r.email))
+
+    let totalCount = 0
+
+    if (toInsert.length > 0) {
+      const { data: inserted, error: insertErr } = await db
+        .from('staff_members')
+        .insert(toInsert)
+        .select('id')
+      if (insertErr) return apiError('Insert failed: ' + insertErr.message, 500)
+      totalCount += inserted?.length ?? 0
+    }
+
+    for (const r of toUpdate) {
+      const id = existingMap.get(r.email)
+      await db.from('staff_members').update(r).eq('id', id)
+      totalCount++
+    }
+
+    const { data, error } = { data: { length: totalCount }, error: null }
+
+    if (error) return apiError('Import failed', 500)
 
     return apiOk({ imported: data?.length ?? records.length })
   } catch (err) {
