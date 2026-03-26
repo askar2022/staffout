@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
 interface Props {
@@ -25,6 +25,13 @@ export default function StaffManager({ initialStaff }: Props) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Archive toggle
+  const [showArchived, setShowArchived] = useState(false)
+
+  const activeStaff   = staff.filter((s) => s.is_active !== false)
+  const archivedStaff = staff.filter((s) => s.is_active === false)
+  const visibleStaff  = showArchived ? archivedStaff : activeStaff
 
   // CSV import state
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -174,8 +181,30 @@ export default function StaffManager({ initialStaff }: Props) {
     setSaving(false)
   }
 
+  async function handleArchive(id: string) {
+    const res = await fetch(`/api/staff/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: false }),
+    })
+    if (res.ok) {
+      setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: false } : s))
+    }
+  }
+
+  async function handleRestore(id: string) {
+    const res = await fetch(`/api/staff/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: true }),
+    })
+    if (res.ok) {
+      setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: true } : s))
+    }
+  }
+
   async function handleDelete(id: string) {
-    if (!confirm('Remove this staff member?')) return
+    if (!confirm('Permanently delete this staff member? This cannot be undone.')) return
     const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' })
     if (res.ok) {
       setStaff((prev) => prev.filter((s) => s.id !== id))
@@ -211,13 +240,28 @@ export default function StaffManager({ initialStaff }: Props) {
           />
         </div>
 
-        <button
-          onClick={startAdd}
-          className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add staff member
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${
+              showArchived
+                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            {showArchived ? `Archived (${archivedStaff.length})` : `Show Archived${archivedStaff.length > 0 ? ` (${archivedStaff.length})` : ''}`}
+          </button>
+          {!showArchived && (
+            <button
+              onClick={startAdd}
+              className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add staff member
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Import result message */}
@@ -301,6 +345,11 @@ export default function StaffManager({ initialStaff }: Props) {
             <p className="text-slate-500 font-medium">No staff members yet</p>
             <p className="text-slate-400 text-sm mt-1">Add your team with their work emails so they can sign in to submit absences.</p>
           </div>
+        ) : visibleStaff.length === 0 ? (
+          <div className="p-12 text-center">
+            <Archive className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">{showArchived ? 'No archived staff' : 'No active staff'}</p>
+          </div>
         ) : (
           <table className="w-full">
             <thead>
@@ -313,11 +362,12 @@ export default function StaffManager({ initialStaff }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {staff.map((member) => (
-                <tr key={member.id} className="hover:bg-slate-50 transition-colors">
+              {visibleStaff.map((member) => (
+                <tr key={member.id} className={`hover:bg-slate-50 transition-colors ${showArchived ? 'opacity-70' : ''}`}>
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-slate-900">{member.full_name}</p>
                     {member.email && <p className="text-xs text-slate-400">{member.email}</p>}
+                    {showArchived && <span className="text-xs text-amber-600 font-medium">Archived</span>}
                   </td>
                   <td className="px-5 py-4 hidden sm:table-cell">
                     <p className="text-sm text-slate-600">{member.position || '—'}</p>
@@ -337,18 +387,41 @@ export default function StaffManager({ initialStaff }: Props) {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => startEdit(member)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(member.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {showArchived ? (
+                        <>
+                          <button
+                            onClick={() => handleRestore(member.id)}
+                            title="Restore"
+                            className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(member.id)}
+                            title="Delete permanently"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(member)}
+                            title="Edit"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleArchive(member.id)}
+                            title="Archive"
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
