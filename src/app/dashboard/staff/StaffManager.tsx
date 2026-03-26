@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, Check, Users, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
 interface Props {
@@ -25,6 +25,94 @@ export default function StaffManager({ initialStaff }: Props) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // CSV import state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  function downloadTemplate() {
+    const csv = [
+      'Full Name,Email,Position,Campus,Supervisor Name,Supervisor Email',
+      'Ms. Johnson,mjohnson@school.org,Math Teacher,Main Campus,Mr. Ahmed,mahmed@school.org',
+      'Mr. Hassan,mhassan@school.org,Science Teacher,Main Campus,Mr. Ahmed,mahmed@school.org',
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'staff-import-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    setImporting(true)
+    setImportResult(null)
+
+    const text = await file.text()
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (lines.length < 2) {
+      setImporting(false)
+      setImportResult({ success: false, message: 'File is empty or missing data rows.' })
+      return
+    }
+
+    // Parse header to find column indexes
+    const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/[^a-z ]/g, ''))
+    const idx = (names: string[]) => names.map((n) => header.findIndex((h) => h.includes(n))).find((i) => i >= 0) ?? -1
+
+    const nameIdx    = idx(['full name', 'name'])
+    const emailIdx   = idx(['email'])
+    const posIdx     = idx(['position', 'role', 'title'])
+    const campusIdx  = idx(['campus', 'site', 'location'])
+    const supNameIdx = idx(['supervisor name', 'supervisor'])
+    const supEmailIdx= idx(['supervisor email'])
+
+    if (nameIdx === -1 || emailIdx === -1) {
+      setImporting(false)
+      setImportResult({ success: false, message: 'CSV must have "Full Name" and "Email" columns.' })
+      return
+    }
+
+    const rows = lines.slice(1).map((line) => {
+      const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+      return {
+        full_name:       cols[nameIdx]     ?? '',
+        email:           cols[emailIdx]    ?? '',
+        position:        posIdx     >= 0 ? cols[posIdx]     : '',
+        campus:          campusIdx  >= 0 ? cols[campusIdx]  : '',
+        supervisor_name: supNameIdx >= 0 ? cols[supNameIdx] : '',
+        supervisor_email:supEmailIdx >= 0 ? cols[supEmailIdx]: '',
+      }
+    }).filter((r) => r.full_name && r.email)
+
+    if (rows.length === 0) {
+      setImporting(false)
+      setImportResult({ success: false, message: 'No valid rows found in the file.' })
+      return
+    }
+
+    const res = await fetch('/api/staff/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    })
+    const data = await res.json()
+    setImporting(false)
+
+    if (res.ok) {
+      setImportResult({ success: true, message: `Successfully imported ${data.imported} staff members.` })
+      // Reload the page to show updated list
+      window.location.reload()
+    } else {
+      setImportResult({ success: false, message: data.error || 'Import failed.' })
+    }
+  }
 
   function startAdd() {
     setEditingId(null)
@@ -96,7 +184,33 @@ export default function StaffManager({ initialStaff }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* CSV import controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center gap-2 text-sm font-medium text-slate-600 border border-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download CSV Template
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 text-sm font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            {importing ? 'Importing...' : 'Import CSV'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleCSVUpload}
+          />
+        </div>
+
         <button
           onClick={startAdd}
           className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -105,6 +219,20 @@ export default function StaffManager({ initialStaff }: Props) {
           Add staff member
         </button>
       </div>
+
+      {/* Import result message */}
+      {importResult && (
+        <div className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl border ${
+          importResult.success
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          {importResult.success
+            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            : <AlertCircle className="w-4 h-4 shrink-0" />}
+          {importResult.message}
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
