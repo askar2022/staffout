@@ -333,3 +333,128 @@ export function buildSupervisorEmail(
 
   return { subject, html, text }
 }
+
+// ── Weekly Attendance Report (Friday noon) ────────────────────────────────────
+
+export interface DaySummary {
+  label: string
+  date: string
+  absent: number
+  late: number
+  leaving: number
+  personal: number
+  total: number
+}
+
+export function buildWeeklyReportEmail(
+  orgName: string,
+  days: DaySummary[],
+  weekLabel: string
+): { subject: string; html: string; text: string } {
+  const subject = `Weekly Attendance Report — ${orgName}`
+
+  const totals = days.reduce(
+    (acc, d) => ({
+      absent: acc.absent + d.absent,
+      late: acc.late + d.late,
+      leaving: acc.leaving + d.leaving,
+      personal: acc.personal + d.personal,
+      total: acc.total + d.total,
+    }),
+    { absent: 0, late: 0, leaving: 0, personal: 0, total: 0 }
+  )
+
+  const tdH = `style="padding:10px 14px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:2px solid #e2e8f0;text-align:center;"`
+  const tdL = `style="padding:10px 14px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:2px solid #e2e8f0;"`
+  const tdCell = (val: number, color = '#0f172a') =>
+    `<td style="padding:10px 14px;font-size:15px;font-weight:600;color:${val > 0 ? color : '#cbd5e1'};text-align:center;border-bottom:1px solid #f1f5f9;">${val > 0 ? val : '—'}</td>`
+  const tdTot = (val: number) =>
+    `<td style="padding:10px 14px;font-size:15px;font-weight:800;color:#0f172a;text-align:center;border-top:2px solid #e2e8f0;background:#f8fafc;">${val}</td>`
+
+  const rows = days.map(d => `
+    <tr>
+      <td style="padding:10px 14px;font-size:14px;font-weight:600;color:#0f172a;border-bottom:1px solid #f1f5f9;">
+        ${d.label}<br><span style="font-size:12px;font-weight:400;color:#94a3b8;">${d.date}</span>
+      </td>
+      ${tdCell(d.absent, '#dc2626')}
+      ${tdCell(d.late, '#d97706')}
+      ${tdCell(d.leaving, '#7c3aed')}
+      ${tdCell(d.personal, '#0891b2')}
+      ${tdCell(d.total)}
+    </tr>`).join('')
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:580px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+    <div style="background:#4f46e5;height:5px;"></div>
+
+    <div style="background:#ffffff;padding:24px 32px 16px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#4f46e5;margin-bottom:4px;">
+        StaffOut &middot; ${orgName}
+      </div>
+      <div style="font-size:20px;font-weight:800;color:#0f172a;line-height:1.3;">
+        Weekly Attendance Report
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-top:3px;">Week of ${weekLabel}</div>
+    </div>
+
+    <div style="padding:24px 32px;">
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <thead>
+          <tr>
+            <th ${tdL}>Day</th>
+            <th ${tdH}>Absent</th>
+            <th ${tdH}>Late</th>
+            <th ${tdH}>Left Early</th>
+            <th ${tdH}>Personal</th>
+            <th ${tdH}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+          <tr>
+            <td style="padding:10px 14px;font-size:14px;font-weight:800;color:#0f172a;border-top:2px solid #e2e8f0;background:#f8fafc;">Week Total</td>
+            ${tdTot(totals.absent)}
+            ${tdTot(totals.late)}
+            ${tdTot(totals.leaving)}
+            ${tdTot(totals.personal)}
+            ${tdTot(totals.total)}
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin:20px 0 0;font-size:13px;color:#64748b;line-height:1.6;">
+        This report shows totals only. Individual details are available in your StaffOut dashboard.
+      </p>
+    </div>
+
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        Sent automatically by <strong style="color:#64748b;">StaffOut</strong> every Friday &middot; Do not reply to this email.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`
+
+  const textRows = days.map(d =>
+    `${d.label.padEnd(12)} Absent:${String(d.absent).padStart(3)}  Late:${String(d.late).padStart(3)}  Early:${String(d.leaving).padStart(3)}  Personal:${String(d.personal).padStart(3)}  Total:${String(d.total).padStart(3)}`
+  ).join('\n')
+
+  const text = [
+    `StaffOut · ${orgName} — Weekly Attendance Report`,
+    `Week of ${weekLabel}`,
+    ``,
+    textRows,
+    ``,
+    `Week Total — Absent: ${totals.absent}  Late: ${totals.late}  Early: ${totals.leaving}  Personal: ${totals.personal}  Total: ${totals.total}`,
+    ``,
+    `Full details available in your StaffOut dashboard.`,
+  ].join('\n')
+
+  return { subject, html, text }
+}
