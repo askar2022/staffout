@@ -227,7 +227,9 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
               onChange={(e) => setNewRecipient((p) => ({ ...p, type: e.target.value as 'admin' }))}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
-              <option value="admin">Admin</option>
+              <option value="admin">Admin (Summary + Instant)</option>
+              <option value="summary">Summary only (8 AM + Weekly report)</option>
+              <option value="instant">Instant only (during-day alerts)</option>
               <option value="all_staff">All Staff</option>
               <option value="reception">Reception</option>
               <option value="hr">HR</option>
