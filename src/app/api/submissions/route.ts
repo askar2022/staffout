@@ -117,10 +117,29 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to save submission', 500)
     }
 
-    // If after 8 AM → fire instant + supervisor emails
-    if (isDuringSchoolHours()) {
-      const sub = submission as Submission
+    const sub = submission as Submission
 
+    // Supervisor always gets an instant alert — coverage cannot wait
+    if (supervisorEmail) {
+      const { subject, html, text } = buildSupervisorEmail(org.name, sub)
+      await sendEmail({
+        to: [supervisorEmail],
+        subject,
+        html,
+        text,
+        replyTo: org.reply_to_email ?? undefined,
+      })
+      await db.from('email_logs').insert({
+        organization_id: orgId,
+        type: 'supervisor',
+        recipients: [supervisorEmail],
+        subject,
+        submission_id: submission.id,
+      })
+    }
+
+    // All-staff instant alert only during school hours (8 AM – 3:30 PM CT)
+    if (isDuringSchoolHours()) {
       const { data: rawRecipients } = await db
         .from('notification_recipients')
         .select('email')
@@ -147,24 +166,6 @@ export async function POST(request: NextRequest) {
           submission_id: submission.id,
           success: result.success,
           error_message: result.success ? null : result.error,
-        })
-      }
-
-      if (supervisorEmail) {
-        const { subject, html, text } = buildSupervisorEmail(org.name, sub)
-        await sendEmail({
-          to: [supervisorEmail],
-          subject,
-          html,
-          text,
-          replyTo: org.reply_to_email ?? undefined,
-        })
-        await db.from('email_logs').insert({
-          organization_id: orgId,
-          type: 'supervisor',
-          recipients: [supervisorEmail],
-          subject,
-          submission_id: submission.id,
         })
       }
 
