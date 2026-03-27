@@ -7,15 +7,26 @@ import type { Submission, NotificationRecipient } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
 const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
-const SUMMARY_HOUR = 8
+const SCHOOL_START_HOUR = 8      // 8:00 AM CT
+const SCHOOL_END_HOUR  = 15      // 3:00 PM CT
+const SCHOOL_END_MINUTE = 30     // 3:30 PM CT
 
-function isAfterSummaryTime(): boolean {
+function getCentralHourMinute(): { hour: number; minute: number } {
   const now = new Date()
-  // Use UTC offset for Central Time: CDT=UTC-5 (Mar-Nov), CST=UTC-6 (Nov-Mar)
-  const utcMonth = now.getUTCMonth() // 0=Jan
-  const isDST = utcMonth >= 2 && utcMonth <= 10 // approx Mar–Nov
-  const centralHour = (now.getUTCHours() - (isDST ? 5 : 6) + 24) % 24
-  return centralHour >= SUMMARY_HOUR
+  // CDT = UTC-5 (approx Mar–Nov), CST = UTC-6 (Nov–Mar)
+  const utcMonth = now.getUTCMonth() // 0 = Jan
+  const isDST = utcMonth >= 2 && utcMonth <= 10
+  const offset = isDST ? 5 : 6
+  const totalMinutes = now.getUTCHours() * 60 + now.getUTCMinutes() - offset * 60
+  const adjusted = ((totalMinutes % 1440) + 1440) % 1440
+  return { hour: Math.floor(adjusted / 60), minute: adjusted % 60 }
+}
+
+function isDuringSchoolHours(): boolean {
+  const { hour, minute } = getCentralHourMinute()
+  const afterStart = hour >= SCHOOL_START_HOUR
+  const beforeEnd  = hour < SCHOOL_END_HOUR || (hour === SCHOOL_END_HOUR && minute < SCHOOL_END_MINUTE)
+  return afterStart && beforeEnd
 }
 
 // ── POST /api/submissions (public — staff submit without logging in) ──────────
@@ -107,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If after 8 AM → fire instant + supervisor emails
-    if (isAfterSummaryTime()) {
+    if (isDuringSchoolHours()) {
       const sub = submission as Submission
 
       const { data: rawRecipients } = await db
