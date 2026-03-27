@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw, RefreshCw } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
 interface Props {
@@ -37,6 +37,26 @@ export default function StaffManager({ initialStaff }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  // Sync to recipients state
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  async function handleSyncToRecipients() {
+    setSyncing(true)
+    setSyncResult(null)
+    const res = await fetch('/api/recipients/sync-staff', { method: 'POST' })
+    const data = await res.json()
+    setSyncing(false)
+    if (res.ok) {
+      const msg = data.added === 0
+        ? data.message
+        : `Added ${data.added} staff member${data.added !== 1 ? 's' : ''} to notification recipients.${data.skipped > 0 ? ` (${data.skipped} already existed)` : ''}`
+      setSyncResult({ success: true, message: msg })
+    } else {
+      setSyncResult({ success: false, message: data.error || 'Sync failed.' })
+    }
+  }
 
   function downloadTemplate() {
     const csv = [
@@ -231,6 +251,14 @@ export default function StaffManager({ initialStaff }: Props) {
             className="hidden"
             onChange={handleCSVUpload}
           />
+          <button
+            onClick={handleSyncToRecipients}
+            disabled={syncing}
+            className="flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Staff → Notifications'}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -257,6 +285,23 @@ export default function StaffManager({ initialStaff }: Props) {
             ? <CheckCircle className="w-4 h-4 shrink-0" />
             : <AlertCircle className="w-4 h-4 shrink-0" />}
           {importResult.message}
+        </div>
+      )}
+
+      {/* Sync result message */}
+      {syncResult && (
+        <div className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl border ${
+          syncResult.success
+            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          {syncResult.success
+            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            : <AlertCircle className="w-4 h-4 shrink-0" />}
+          {syncResult.message}
+          {syncResult.success && (
+            <span className="ml-1 text-indigo-600">Go to Settings → Notification Recipients to adjust their roles.</span>
+          )}
         </div>
       )}
 
