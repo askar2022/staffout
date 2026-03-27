@@ -10,9 +10,11 @@ const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
 const SUMMARY_HOUR = 8
 
 function isAfterSummaryTime(): boolean {
-  const centralHour = parseInt(
-    new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' })
-  )
+  const now = new Date()
+  // Use UTC offset for Central Time: CDT=UTC-5 (Mar-Nov), CST=UTC-6 (Nov-Mar)
+  const utcMonth = now.getUTCMonth() // 0=Jan
+  const isDST = utcMonth >= 2 && utcMonth <= 10 // approx Mar–Nov
+  const centralHour = (now.getUTCHours() - (isDST ? 5 : 6) + 24) % 24
   return centralHour >= SUMMARY_HOUR
 }
 
