@@ -27,6 +27,7 @@ export async function GET(request: Request) {
         .eq('organization_id', org.id)
         .eq('date', today)
         .eq('summary_included', false)
+        .eq('instant_sent', false)
 
       const submissions = (rawSubs ?? []) as Submission[]
 
