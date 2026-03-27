@@ -10,7 +10,10 @@ const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
 const SUMMARY_HOUR = 8
 
 function isAfterSummaryTime(): boolean {
-  return new Date().getHours() >= SUMMARY_HOUR
+  const centralHour = parseInt(
+    new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' })
+  )
+  return centralHour >= SUMMARY_HOUR
 }
 
 // ── POST /api/submissions (public — staff submit without logging in) ──────────
