@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +14,8 @@ import {
   LogOut,
   ExternalLink,
   BarChart2,
+  Menu,
+  X,
 } from 'lucide-react'
 
 const navItems = [
@@ -33,6 +36,7 @@ export default function DashboardSidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -41,8 +45,8 @@ export default function DashboardSidebar({
     router.refresh()
   }
 
-  return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+  const NavContent = ({ onNav }: { onNav?: () => void }) => (
+    <>
       {/* Logo */}
       <div className="p-5 border-b border-slate-200">
         <div className="flex items-center gap-2 mb-0.5">
@@ -62,6 +66,7 @@ export default function DashboardSidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNav}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
                   ? 'bg-indigo-50 text-indigo-700'
@@ -80,6 +85,7 @@ export default function DashboardSidebar({
         <Link
           href="/submit"
           target="_blank"
+          onClick={onNav}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
         >
           <ExternalLink className="w-4 h-4 shrink-0" />
@@ -98,6 +104,53 @@ export default function DashboardSidebar({
           <p className="text-xs text-slate-400 truncate">{userEmail}</p>
         </div>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* ── Desktop sidebar (hidden on mobile) ── */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
+        <NavContent />
+      </aside>
+
+      {/* ── Mobile top bar ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="font-bold text-slate-900">StaffOut</span>
+          <span className="text-xs text-slate-400 truncate max-w-[140px]">· {orgName}</span>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* ── Mobile drawer overlay ── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+          />
+          {/* Drawer */}
+          <aside className="relative w-72 bg-white flex flex-col h-full shadow-xl">
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <NavContent onNav={() => setMobileOpen(false)} />
+          </aside>
+        </div>
+      )}
+    </>
   )
 }

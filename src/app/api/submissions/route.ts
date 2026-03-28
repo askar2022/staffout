@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
-import { buildInstantEmail, buildSupervisorEmail } from '@/lib/email/templates'
+import { buildInstantEmail, buildSupervisorEmail, buildConfirmationEmail } from '@/lib/email/templates'
 import type { Submission, NotificationRecipient } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
@@ -118,6 +118,19 @@ export async function POST(request: NextRequest) {
     }
 
     const sub = submission as Submission
+
+    // Always send confirmation back to the staff member who submitted
+    const staffEmail = body.email as string | undefined
+    if (staffEmail) {
+      const { subject, html, text } = buildConfirmationEmail(org.name, sub)
+      await sendEmail({
+        to: [staffEmail],
+        subject,
+        html,
+        text,
+        replyTo: org.reply_to_email ?? undefined,
+      })
+    }
 
     // Supervisor always gets an instant alert — coverage cannot wait
     if (supervisorEmail) {

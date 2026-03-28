@@ -1,6 +1,95 @@
 import { Submission, STATUS_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 
+// ── Staff Confirmation Email ──────────────────────────────────────────────────
+
+export function buildConfirmationEmail(
+  orgName: string,
+  submission: Submission
+): { subject: string; html: string; text: string } {
+  const statusLabel = STATUS_LABELS[submission.status] ?? submission.status
+  const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+  const hasSupervisor = !!submission.supervisor_name
+
+  const subject = `Your absence has been recorded — ${dateStr}`
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+    <div style="background:#4f46e5;height:5px;"></div>
+
+    <div style="padding:28px 32px 20px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#4f46e5;margin-bottom:6px;">
+        ${orgName}
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
+        Absence Recorded ✓
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px;">${dateStr}</div>
+    </div>
+
+    <div style="padding:0 32px 24px;">
+      <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+        Hi <strong>${submission.staff_name}</strong>, your absence submission has been received and recorded.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:10px;">Submission Details</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;width:110px;">Status</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${statusLabel}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Date</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${dateStr}</td>
+          </tr>
+          ${submission.notes ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">Notes</td>
+            <td style="font-size:13px;color:#0f172a;padding:4px 0;">${submission.notes}</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      ${hasSupervisor ? `
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;color:#1e40af;line-height:1.5;">
+        <strong>${submission.supervisor_name}</strong> has been notified and is aware of your absence.
+      </div>` : `
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;font-size:13px;color:#166534;line-height:1.5;">
+        Your school has been notified and is aware of your absence.
+      </div>`}
+    </div>
+
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        This is an automated confirmation from <strong style="color:#64748b;">${orgName}</strong>. Please do not reply.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`
+
+  const text = [
+    `Absence Recorded — ${orgName}`,
+    ``,
+    `Hi ${submission.staff_name},`,
+    `Your absence has been recorded for ${dateStr}.`,
+    `Status: ${statusLabel}`,
+    submission.notes ? `Notes: ${submission.notes}` : '',
+    ``,
+    hasSupervisor
+      ? `${submission.supervisor_name} has been notified.`
+      : `Your school has been notified.`,
+  ].filter(Boolean).join('\n')
+
+  return { subject, html, text }
+}
+
 function formatCentralTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return new Intl.DateTimeFormat('en-US', {
