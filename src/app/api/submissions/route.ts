@@ -120,7 +120,6 @@ export async function POST(request: NextRequest) {
     const sub = submission as Submission
 
     // Always send confirmation back to the staff member who submitted
-    const staffEmail = body.email as string | undefined
     if (staffEmail) {
       const { subject, html, text } = buildConfirmationEmail(org.name, sub)
       await sendEmail({
