@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -36,7 +36,22 @@ export default function DashboardSidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  useEffect(() => {
+    function check() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Close drawer on route change
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [pathname])
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -45,112 +60,143 @@ export default function DashboardSidebar({
     router.refresh()
   }
 
-  const NavContent = ({ onNav }: { onNav?: () => void }) => (
-    <>
-      {/* Logo */}
-      <div className="p-5 border-b border-slate-200">
-        <div className="flex items-center gap-2 mb-0.5">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-bold text-slate-900">StaffOut</span>
-        </div>
-        <p className="text-xs text-slate-500 truncate mt-1 pl-9">{orgName}</p>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5">
-        {navItems.map((item) => {
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNav}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <item.icon className="w-4 h-4 shrink-0" />
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Bottom */}
-      <div className="p-3 border-t border-slate-200 space-y-1">
-        <Link
-          href="/submit"
-          target="_blank"
-          onClick={onNav}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-        >
-          <ExternalLink className="w-4 h-4 shrink-0" />
-          Staff Form
-        </Link>
-
-        <button
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
-        >
-          <LogOut className="w-4 h-4 shrink-0" />
-          Sign out
-        </button>
-
-        <div className="px-3 pt-2">
-          <p className="text-xs text-slate-400 truncate">{userEmail}</p>
-        </div>
-      </div>
-    </>
+  const NavLinks = () => (
+    <nav style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {navItems.map((item) => {
+        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              textDecoration: 'none',
+              color: active ? '#4338ca' : '#475569',
+              backgroundColor: active ? '#eef2ff' : 'transparent',
+            }}
+          >
+            <item.icon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
   )
 
-  return (
-    <>
-      {/* ── Desktop sidebar (hidden on mobile) ── */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
-        <NavContent />
-      </aside>
+  const SidebarBottom = () => (
+    <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <Link
+        href="/submit"
+        target="_blank"
+        style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 12px', borderRadius: '8px', fontSize: '14px',
+          fontWeight: '500', textDecoration: 'none', color: '#475569',
+        }}
+      >
+        <ExternalLink style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+        Staff Form
+      </Link>
+      <button
+        onClick={handleSignOut}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 12px', borderRadius: '8px', fontSize: '14px',
+          fontWeight: '500', color: '#475569', background: 'none',
+          border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
+        }}
+      >
+        <LogOut style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+        Sign out
+      </button>
+      <p style={{ fontSize: '12px', color: '#94a3b8', padding: '4px 12px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {userEmail}
+      </p>
+    </div>
+  )
 
-      {/* ── Mobile top bar ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-bold text-slate-900">StaffOut</span>
-          <span className="text-xs text-slate-400 truncate max-w-[140px]">· {orgName}</span>
+  const LogoBlock = () => (
+    <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+        <div style={{ width: '28px', height: '28px', background: '#4f46e5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Zap style={{ width: '14px', height: '14px', color: 'white' }} />
         </div>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <span style={{ fontWeight: '700', color: '#0f172a' }}>StaffOut</span>
       </div>
+      <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', paddingLeft: '36px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {orgName}
+      </p>
+    </div>
+  )
 
-      {/* ── Mobile drawer overlay ── */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-          />
-          {/* Drawer */}
-          <aside className="relative w-72 bg-white flex flex-col h-full shadow-xl">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <NavContent onNav={() => setMobileOpen(false)} />
-          </aside>
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {/* Fixed top bar */}
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'white', borderBottom: '1px solid #e2e8f0',
+          padding: '12px 16px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '28px', height: '28px', background: '#4f46e5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap style={{ width: '14px', height: '14px', color: 'white' }} />
+            </div>
+            <span style={{ fontWeight: '700', color: '#0f172a' }}>StaffOut</span>
+            <span style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {orgName}</span>
+          </div>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            style={{ padding: '8px', borderRadius: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#475569' }}
+          >
+            <Menu style={{ width: '22px', height: '22px' }} />
+          </button>
         </div>
-      )}
-    </>
+
+        {/* Drawer */}
+        {drawerOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+            {/* Backdrop */}
+            <div
+              onClick={() => setDrawerOpen(false)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}
+            />
+            {/* Drawer panel */}
+            <div style={{
+              position: 'relative', width: '280px', background: 'white',
+              display: 'flex', flexDirection: 'column', height: '100%',
+              boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
+            }}>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                style={{ position: 'absolute', top: '14px', right: '14px', padding: '6px', border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X style={{ width: '20px', height: '20px' }} />
+              </button>
+              <LogoBlock />
+              <NavLinks />
+              <SidebarBottom />
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // ── Desktop sidebar ──────────────────────────────────────────────────────────
+  return (
+    <aside style={{ width: '256px', background: 'white', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <LogoBlock />
+      <NavLinks />
+      <SidebarBottom />
+    </aside>
   )
 }

@@ -66,7 +66,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <DashboardSidebar orgName={orgName} userEmail={user.email ?? ''} />
-      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+      <main className="flex-1 overflow-y-auto dashboard-main">
         {impersonateOrgId && (
           <SchoolSwitcherBanner orgName={orgName} orgId={orgId} />
         )}
