@@ -13,10 +13,26 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Mobile dashboard top-bar offset */
-@media (max-width: 767px) {
+/* Dashboard responsive layout */
+.dashboard-sidebar-desktop {
+  display: none;
+}
+.dashboard-topbar {
+  display: flex;
+}
+.dashboard-main {
+  padding-top: 56px;
+}
+
+@media (min-width: 768px) {
+  .dashboard-sidebar-desktop {
+    display: flex;
+  }
+  .dashboard-topbar {
+    display: none;
+  }
   .dashboard-main {
-    padding-top: 56px;
+    padding-top: 0;
   }
 }
 
