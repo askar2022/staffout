@@ -130,35 +130,13 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
             </button>
           </form>
 
-          {isSubdomain && (
-            <p className="text-center text-sm text-slate-500 mt-5">
-              New school?{' '}
-              <Link
-                href={`${typeof window !== 'undefined' ? window.location.protocol : 'https:'}//${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'}/signup`}
-                className="text-indigo-600 font-medium hover:underline"
-              >
-                Register your school →
-              </Link>
-            </p>
-          )}
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          {isSubdomain ? (
-            <>
-              Staff submitting an absence?{' '}
-              <Link href="/submit" className="text-indigo-500 hover:underline">
-                Go to the form →
-              </Link>
-            </>
-          ) : (
-            <>
-              School admin?{' '}
-              <Link href="/signup" className="text-indigo-500 hover:underline">
-                Register your school →
-              </Link>
-            </>
-          )}
+          Staff submitting an absence?{' '}
+          <Link href="/submit" className="text-indigo-500 hover:underline">
+            Go to the form →
+          </Link>
         </p>
       </div>
     </div>
