@@ -48,6 +48,7 @@ export default async function SettingsPage() {
         org={org as Organization}
         initialRecipients={(recipients ?? []) as NotificationRecipient[]}
         orgId={orgId ?? ''}
+        orgSlug={(org as Organization)?.slug ?? ''}
       />
     </div>
   )

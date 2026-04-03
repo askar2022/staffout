@@ -8,9 +8,10 @@ interface Props {
   org: Organization
   initialRecipients: NotificationRecipient[]
   orgId: string
+  orgSlug: string
 }
 
-export default function SettingsForm({ org, initialRecipients }: Props) {
+export default function SettingsForm({ org, initialRecipients, orgSlug }: Props) {
   const [orgName, setOrgName] = useState(org?.name ?? '')
   const [replyTo, setReplyTo] = useState(org?.reply_to_email ?? '')
   const [summaryTime, setSummaryTime] = useState(org?.summary_send_time ?? '08:00')
@@ -291,11 +292,16 @@ export default function SettingsForm({ org, initialRecipients }: Props) {
           <p className="text-xs text-slate-500 mb-1 font-medium">Staff submission link</p>
           <div className="flex items-center gap-2">
             <code className="text-sm text-indigo-700 flex-1 truncate">
-              {typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit
+              {orgSlug
+                ? `https://${orgSlug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'outofshift.com'}/submit`
+                : (typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com') + '/submit'
+              }
             </code>
             <button
               onClick={() => navigator.clipboard?.writeText(
-                `${typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit`
+                orgSlug
+                  ? `https://${orgSlug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'outofshift.com'}/submit`
+                  : `${typeof window !== 'undefined' ? window.location.origin : 'https://outofshift.com'}/submit`
               )}
               className="text-xs font-semibold text-indigo-600 hover:underline shrink-0 bg-indigo-100 px-2 py-1 rounded"
             >
