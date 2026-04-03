@@ -18,19 +18,50 @@ export async function POST(request: NextRequest) {
 
     const db = createAdminClient()
 
-    // Find which organization this email belongs to
-    const { data: staffMember } = await db
+    // Resolve org from subdomain slug (sent by client from window.location)
+    // Falls back to x-org-slug header injected by middleware for server-side calls
+    const orgSlug: string | null =
+      sanitize(body.org_slug ?? '', 63) || request.headers.get('x-org-slug')
+
+    let orgId: string | null = null
+    let orgName: string | null = null
+
+    if (orgSlug) {
+      const { data: org } = await db
+        .from('organizations')
+        .select('id, name, status')
+        .eq('slug', orgSlug)
+        .single()
+
+      if (!org || org.status !== 'approved') {
+        return apiError('This school is not active. Please contact your administrator.', 403)
+      }
+
+      orgId = org.id
+      orgName = org.name
+    }
+
+    // Find the staff member — scoped to the org if we have one
+    let staffQuery = db
       .from('staff_members')
       .select('id, full_name, organization_id, position, campus')
       .eq('email', email)
       .eq('is_active', true)
-      .single()
 
-    // If email not in any staff directory, still send a code
-    // but we won't auto-fill their details (they can enter manually)
-    const orgId = staffMember?.organization_id ?? null
+    if (orgId) {
+      staffQuery = staffQuery.eq('organization_id', orgId)
+    }
 
-    // Delete any existing unused codes for this email
+    const { data: staffMember } = await staffQuery.single()
+
+    // If an org is set and this email isn't in their directory, still allow
+    // submission — maybe they're a new staff member not yet added.
+    // The OTP is scoped to the org either way.
+    if (!orgId && staffMember) {
+      orgId = staffMember.organization_id
+    }
+
+    // Delete any existing unused codes for this email + org
     await db
       .from('otp_codes')
       .delete()
@@ -48,7 +79,6 @@ export async function POST(request: NextRequest) {
       used: false,
     })
 
-    // Send the code via email
     const html = `
       <!DOCTYPE html>
       <html>
@@ -56,7 +86,7 @@ export async function POST(request: NextRequest) {
       <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
         <div style="max-width:480px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
           <div style="background:#4f46e5;padding:28px 32px;">
-            <div style="font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#c7d2fe;margin-bottom:4px;">StaffOut</div>
+            <div style="font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#c7d2fe;margin-bottom:4px;">${orgName ?? 'StaffOut'}</div>
             <div style="font-size:20px;font-weight:700;color:#ffffff;">Your sign-in code</div>
           </div>
           <div style="padding:32px;">
@@ -78,20 +108,18 @@ export async function POST(request: NextRequest) {
 
     const result = await sendEmail({
       to: [email],
-      subject: `${code} — Your StaffOut verification code`,
+      subject: `${code} — Your ${orgName ?? 'StaffOut'} verification code`,
       html,
-      text: `Your StaffOut verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, ignore this email.`,
+      text: `Your ${orgName ?? 'StaffOut'} verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, ignore this email.`,
     })
 
     if (!result.success) {
       return apiError('Failed to send code. Check your email address.', 500)
     }
 
-    // Return whether this email is in the staff directory (so frontend knows)
     return apiOk({
       success: true,
       is_known_staff: !!staffMember,
-      // Never return the code or staff details here
     })
   } catch {
     return apiError('Server error', 500)

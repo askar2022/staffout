@@ -16,7 +16,7 @@ async function requireSuperAdmin() {
   return user
 }
 
-// GET — list all organizations with status
+// GET — list all organizations
 export async function GET() {
   try {
     await requireSuperAdmin()
@@ -24,11 +24,57 @@ export async function GET() {
 
     const { data, error } = await db
       .from('organizations')
-      .select('id, name, contact_email, status, created_at')
+      .select('id, name, slug, contact_email, status, created_at')
       .order('created_at', { ascending: false })
 
     if (error) return apiError('Failed to load organizations', 500)
     return apiOk({ organizations: data ?? [] })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error'
+    return apiError(msg, msg === 'Forbidden' ? 403 : 401)
+  }
+}
+
+// POST — create an organization directly (super admin only, auto-approved)
+export async function POST(request: NextRequest) {
+  try {
+    await requireSuperAdmin()
+    const body = await request.json()
+    const { name, slug, contact_email } = body
+
+    if (!name || !slug) return apiError('name and slug are required')
+
+    const clean = slug.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    if (!clean) return apiError('Invalid slug')
+
+    const RESERVED = ['www', 'api', 'mail', 'admin', 'support']
+    if (RESERVED.includes(clean)) return apiError(`"${clean}" is a reserved subdomain`)
+
+    const db = createAdminClient()
+
+    const { data: existing } = await db
+      .from('organizations')
+      .select('id')
+      .eq('slug', clean)
+      .single()
+
+    if (existing) return apiError(`The subdomain "${clean}" is already taken`)
+
+    const { data: org, error } = await db
+      .from('organizations')
+      .insert({
+        name: name.trim(),
+        slug: clean,
+        contact_email: contact_email || null,
+        reply_to_email: contact_email || null,
+        status: 'approved',
+      })
+      .select('id, name, slug, contact_email, status, created_at')
+      .single()
+
+    if (error || !org) return apiError('Failed to create organization', 500)
+
+    return apiOk({ org }, 201)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error'
     return apiError(msg, msg === 'Forbidden' ? 403 : 401)
@@ -52,14 +98,15 @@ export async function PATCH(request: NextRequest) {
       .from('organizations')
       .update({ status: action })
       .eq('id', org_id)
-      .select('name, contact_email')
+      .select('name, slug, contact_email')
       .single()
 
     if (error || !org) return apiError('Failed to update organization', 500)
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://outofshift.com'
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `https://${rootDomain}`
+    const schoolUrl = org.slug ? `https://${org.slug}.${rootDomain}` : appUrl
 
-    // Email the school admin about the decision
     if (org.contact_email) {
       if (action === 'approved') {
         await sendEmail({
@@ -72,15 +119,20 @@ export async function PATCH(request: NextRequest) {
                 <div style="color:#bbf7d0;font-size:14px;margin-top:4px;">Your StaffOut account is now active</div>
               </div>
               <div style="padding:28px 32px;">
-                <p style="color:#374151;font-size:15px;margin:0 0 20px;">
-                  Hi! Your account for <strong>${org.name}</strong> has been approved. You can now sign in and start using StaffOut.
+                <p style="color:#374151;font-size:15px;margin:0 0 12px;">
+                  Hi! Your account for <strong>${org.name}</strong> has been approved.
                 </p>
-                <a href="${appUrl}/login" style="display:inline-block;background:#4f46e5;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">
+                ${org.slug ? `
+                <p style="color:#374151;font-size:15px;margin:0 0 20px;">
+                  Your school's URL is:<br>
+                  <a href="${schoolUrl}" style="color:#4f46e5;font-weight:600;">${schoolUrl}</a>
+                </p>` : ''}
+                <a href="${schoolUrl}/login" style="display:inline-block;background:#4f46e5;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">
                   Sign in to your dashboard →
                 </a>
               </div>
             </div>`,
-          text: `Your StaffOut account for ${org.name} has been approved. Sign in at ${appUrl}/login`,
+          text: `Your StaffOut account for ${org.name} has been approved.\n\nSign in at: ${schoolUrl}/login`,
         })
       } else {
         await sendEmail({
@@ -97,6 +149,47 @@ export async function PATCH(request: NextRequest) {
     }
 
     return apiOk({ success: true, org_id, action })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error'
+    return apiError(msg, msg === 'Forbidden' ? 403 : 401)
+  }
+}
+
+// PUT — update an organization's subdomain slug
+export async function PUT(request: NextRequest) {
+  try {
+    await requireSuperAdmin()
+    const body = await request.json()
+    const { org_id, slug } = body
+
+    if (!org_id || !slug) return apiError('org_id and slug are required')
+
+    const clean = slug.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    if (!clean) return apiError('Invalid slug')
+
+    const RESERVED = ['www', 'api', 'mail', 'admin', 'support', 'demo']
+    if (RESERVED.includes(clean)) return apiError(`"${clean}" is a reserved subdomain`)
+
+    const db = createAdminClient()
+
+    // Check for conflicts
+    const { data: existing } = await db
+      .from('organizations')
+      .select('id')
+      .eq('slug', clean)
+      .neq('id', org_id)
+      .single()
+
+    if (existing) return apiError(`The subdomain "${clean}" is already taken`)
+
+    const { error } = await db
+      .from('organizations')
+      .update({ slug: clean })
+      .eq('id', org_id)
+
+    if (error) return apiError('Failed to update slug', 500)
+
+    return apiOk({ success: true, slug: clean })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error'
     return apiError(msg, msg === 'Forbidden' ? 403 : 401)

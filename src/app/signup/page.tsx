@@ -1,168 +1,47 @@
-'use client'
-
-import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Zap, Mail, Lock, User, Building2, AlertCircle, CheckCircle } from 'lucide-react'
+import { Zap, Mail, ArrowRight } from 'lucide-react'
 
 export default function SignupPage() {
-  const [schoolName, setSchoolName] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-
-  async function handleSignup(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          school_name: schoolName,
-        },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/pending`,
-      },
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      setSuccess(true)
-      setLoading(false)
-    }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-          <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-7 h-7 text-green-600" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Check your email</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            We sent a confirmation link to <strong>{email}</strong>.
-            Click the link to verify your account — your school will be reviewed and approved shortly.
-          </p>
-          <p className="text-xs text-slate-400 mt-4">Check your spam folder if you don't see it within a few minutes.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+      <div className="w-full max-w-md text-center">
+        <div className="mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
               <Zap className="w-5 h-5 text-white" />
             </div>
             <span className="text-2xl font-bold text-slate-900">StaffOut</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Register your school — takes 2 minutes</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h1 className="text-xl font-bold text-slate-900 mb-1">Register Your School</h1>
-          <p className="text-sm text-slate-500 mb-6">
-            Fill in your details. After confirming your email, your account will be reviewed and approved.
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10">
+          <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <Mail className="w-7 h-7 text-indigo-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">Get StaffOut for your school</h1>
+          <p className="text-slate-500 text-sm leading-relaxed mb-8">
+            We onboard schools directly. Send us an email and we will get your school set up — usually within one business day.
           </p>
-
-          {error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">School / Organization name</label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  required
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  placeholder="e.g. Sankofa Prep Academy"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Your full name</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Work email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@yourschool.org"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 mt-2"
-            >
-              {loading ? 'Submitting...' : 'Register School →'}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-slate-500 mt-5">
-            Already registered?{' '}
-            <Link href="/login" className="text-indigo-600 font-medium hover:underline">
-              Admin Sign In
-            </Link>
+          <a
+            href="mailto:support@outofshift.com?subject=StaffOut%20school%20signup&body=School%20name%3A%0AContact%20name%3A%0AContact%20email%3A"
+            className="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors"
+          >
+            Email us to get started <ArrowRight className="w-4 h-4" />
+          </a>
+          <p className="text-xs text-slate-400 mt-5">
+            Or email us directly at{' '}
+            <a href="mailto:support@outofshift.com" className="text-indigo-500 hover:underline">
+              support@outofshift.com
+            </a>
           </p>
         </div>
+
+        <p className="text-center text-sm text-slate-500 mt-6">
+          Already set up?{' '}
+          <Link href="/login" className="text-indigo-600 font-medium hover:underline">
+            Admin sign in →
+          </Link>
+        </p>
       </div>
     </div>
   )

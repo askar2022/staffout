@@ -6,6 +6,7 @@ import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck } from 'luci
 import type { SubmissionStatus } from '@/lib/types'
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
+import { getClientOrgSlug } from '@/lib/org-slug'
 
 type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
 
@@ -91,7 +92,7 @@ function SubmitForm() {
     const res = await fetch('/api/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, org_slug: getClientOrgSlug() }),
     })
 
     const data = await res.json()

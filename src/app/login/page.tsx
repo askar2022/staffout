@@ -1,114 +1,14 @@
-'use client'
+import { getOrgBySlug, getOrgSlugFromRequest } from '@/lib/get-org'
+import LoginForm from './LoginForm'
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react'
+export default async function LoginPage() {
+  const orgSlug = await getOrgSlugFromRequest()
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      router.push('/dashboard')
-      router.refresh()
-    }
+  let orgName: string | null = null
+  if (orgSlug) {
+    const org = await getOrgBySlug(orgSlug)
+    orgName = org?.name ?? null
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-slate-900">StaffOut</span>
-          </Link>
-          <p className="text-slate-500 mt-2">Admin sign in</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h1 className="text-xl font-bold text-slate-900 mb-6">Welcome back</h1>
-
-          {error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@yourschool.org"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-slate-500 mt-5">
-            New school?{' '}
-            <Link href="/signup" className="text-indigo-600 font-medium hover:underline">
-              Register your school →
-            </Link>
-          </p>
-        </div>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Staff submitting an absence?{' '}
-          <Link href="/submit" className="text-indigo-500 hover:underline">
-            Go to the form →
-          </Link>
-        </p>
-      </div>
-    </div>
-  )
+  return <LoginForm orgName={orgName} orgSlug={orgSlug} />
 }

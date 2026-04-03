@@ -33,18 +33,24 @@ export async function POST(request: NextRequest) {
       .update({ used: true })
       .eq('id', otpRecord.id)
 
-    // Look up all staff members with this email (may be multiple for demo/multi-role)
-    const { data: staffMembers } = await db
+    // The org is the one stored in the OTP record (set when the code was created,
+    // scoped to the subdomain the user submitted from)
+    const orgId = otpRecord.organization_id
+
+    // Look up all active staff members with this email, scoped to this org
+    let staffQuery = db
       .from('staff_members')
       .select('id, full_name, position, campus, supervisor_email, supervisor_name, organization_id')
       .eq('email', email)
       .eq('is_active', true)
 
-    // Get org info
-    const orgId = (staffMembers && staffMembers.length > 0)
-      ? staffMembers[0].organization_id
-      : otpRecord.organization_id
+    if (orgId) {
+      staffQuery = staffQuery.eq('organization_id', orgId)
+    }
 
+    const { data: staffMembers } = await staffQuery
+
+    // Get org info
     let orgInfo = null
     if (orgId) {
       const { data: org } = await db
@@ -68,9 +74,7 @@ export async function POST(request: NextRequest) {
     return apiOk({
       verified: true,
       email,
-      // single staff for backward compat (first match)
       staff: staffList.length === 1 ? staffList[0] : null,
-      // full list so the form can show a picker when there are multiple
       staffList,
       org: orgInfo ? { id: orgInfo.id, name: orgInfo.name } : null,
     })
