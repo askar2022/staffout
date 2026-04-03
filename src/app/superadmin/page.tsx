@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, XCircle, Clock, Shield, Building2, Mail, LayoutDashboard, Link2, Pencil, Check, X, Plus, Send } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Shield, Building2, Mail, LayoutDashboard, Link2, Pencil, Check, X, Plus, Send, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 
 interface Org {
@@ -147,13 +148,25 @@ export default function SuperAdminPage() {
               <p className="text-slate-500 text-sm">Review, approve, and manage school subdomains</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white font-semibold px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add school
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                await createClient().auth.signOut()
+                window.location.href = '/login'
+              }}
+              className="flex items-center gap-2 border border-slate-300 text-slate-600 font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 bg-indigo-600 text-white font-semibold px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add school
+            </button>
+          </div>
         </div>
 
         {showCreate && (

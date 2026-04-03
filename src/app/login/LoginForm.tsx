@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react'
+import { Zap, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react'
 
 interface Props {
   orgName: string | null
@@ -17,6 +17,8 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -57,6 +59,20 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
 
     router.push('/dashboard')
     router.refresh()
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError('Enter your email address above first, then click Forgot password.')
+      return
+    }
+    setResetLoading(true)
+    setError('')
+    const supabase = createClient()
+    const redirectTo = `${window.location.origin}/login`
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    setResetSent(true)
+    setResetLoading(false)
   }
 
   const isSubdomain = !!orgSlug
@@ -128,6 +144,22 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
+
+            {resetSent ? (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm p-3 rounded-lg">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                Password reset link sent — check your email.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetLoading}
+                className="w-full text-sm text-slate-400 hover:text-indigo-600 transition-colors text-center"
+              >
+                {resetLoading ? 'Sending...' : 'Forgot password?'}
+              </button>
+            )}
           </form>
 
         </div>
