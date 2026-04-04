@@ -36,6 +36,14 @@ body {
   }
 }
 
+/* Safe area inset utilities for iOS notch/Dynamic Island */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
