@@ -54,9 +54,12 @@ export async function POST(request: NextRequest) {
 
     const { data: staffMember } = await staffQuery.single()
 
-    // If an org is set and this email isn't in their directory, still allow
-    // submission — maybe they're a new staff member not yet added.
-    // The OTP is scoped to the org either way.
+    // For real schools (non-demo), block if email is not in the staff directory
+    if (orgId && orgSlug !== 'demo' && !staffMember) {
+      return apiError('This email is not in the staff directory. Contact your administrator to be added.', 403)
+    }
+
+    // No org resolved yet — try to find it from the staff member's org
     if (!orgId && staffMember) {
       orgId = staffMember.organization_id
     }
