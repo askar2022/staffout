@@ -78,7 +78,7 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
   const isSubdomain = !!orgSlug
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 safe-area-top pb-safe">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 pb-safe" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">

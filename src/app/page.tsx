@@ -19,7 +19,7 @@ export default async function HomePage() {
     <div className="min-h-screen bg-white">
 
       {/* Nav */}
-      <nav className="border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur z-10 safe-area-top">
+      <nav className="border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">

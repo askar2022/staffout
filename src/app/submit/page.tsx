@@ -213,7 +213,7 @@ function SubmitForm() {
   return (
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
-      <div className="bg-indigo-600 px-4 pb-16 safe-area-top" style={{ paddingTop: 'calc(2.5rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="bg-indigo-600 px-4 pb-16" style={{ paddingTop: 'calc(2.5rem + env(safe-area-inset-top, 0px))' }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
