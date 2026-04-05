@@ -35,6 +35,14 @@ interface VerifiedStaff {
 interface OrgInfo {
   id: string
   name: string
+  slug?: string
+}
+
+// Maps org slug → public logo file in /public folder
+const ORG_LOGOS: Record<string, string> = {
+  hba: '/hba.png',
+  spa: '/SPA.png',
+  wva: '/WVA.jfif',
 }
 
 export default function SubmitPage() {
@@ -53,6 +61,11 @@ function SubmitForm() {
   const [email, setEmail] = useState('')
   const [sendingCode, setSendingCode] = useState(false)
   const [sendError, setSendError] = useState('')
+
+  // Pre-fetch org info from subdomain slug on mount
+  const [orgSlug] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? getClientOrgSlug() : null
+  )
 
   // If arriving from homepage with email already sent, skip to code step
   useEffect(() => {
@@ -74,6 +87,17 @@ function SubmitForm() {
   // Step 3 — form
   const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null)
   const [org, setOrg] = useState<OrgInfo | null>(null)
+
+  // Pre-fetch org info from slug so header shows school name/logo immediately
+  useEffect(() => {
+    if (!orgSlug || orgSlug === 'demo') return
+    fetch(`/api/public/org?slug=${orgSlug}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) setOrg(data)
+      })
+      .catch(() => {})
+  }, [orgSlug])
   const [status, setStatus] = useState<SubmissionStatus | ''>('')
   const [expectedArrival, setExpectedArrival] = useState('')
   const [leaveTime, setLeaveTime] = useState('')
@@ -217,13 +241,25 @@ function SubmitForm() {
         <div className="max-w-lg mx-auto">
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
-              <Zap className="w-9 h-9 text-white" />
-            </div>
-            <span className="text-white font-extrabold text-2xl tracking-wide">Absence</span>
-            {org?.name && (
-              <span className="text-indigo-200 text-sm font-medium mt-1">{org.name}</span>
+            {orgSlug && ORG_LOGOS[orgSlug] ? (
+              // School logo from /public
+              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white flex items-center justify-center mb-3 shadow-lg">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={ORG_LOGOS[orgSlug]}
+                  alt={org?.name ?? orgSlug}
+                  className="w-full h-full object-contain p-1"
+                />
+              </div>
+            ) : (
+              // Default: Zap icon for demo and unknown orgs
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
+                <Zap className="w-9 h-9 text-white" />
+              </div>
             )}
+            <span className="text-white font-extrabold text-2xl tracking-wide">
+              {orgSlug && ORG_LOGOS[orgSlug] && org?.name ? org.name : 'Absence'}
+            </span>
           </div>
           {/* Step context */}
           <h1 className="text-xl font-bold text-white mb-1">Report your absence</h1>
