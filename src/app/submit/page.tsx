@@ -220,7 +220,7 @@ function SubmitForm() {
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
               <Zap className="w-9 h-9 text-white" />
             </div>
-            <span className="text-white font-extrabold text-2xl tracking-wide">StaffOut</span>
+            <span className="text-white font-extrabold text-2xl tracking-wide">Absence</span>
             {org?.name && (
               <span className="text-indigo-200 text-sm font-medium mt-1">{org.name}</span>
             )}
