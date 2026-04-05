@@ -213,19 +213,21 @@ function SubmitForm() {
   return (
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
-      <div className="bg-indigo-600 px-4 pb-16" style={{ paddingTop: 'calc(2.5rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="bg-indigo-600 px-4 pb-20 text-center" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}>
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
+          {/* Logo + app name */}
+          <div className="flex flex-col items-center mb-5">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
+              <Zap className="w-9 h-9 text-white" />
             </div>
-            <span className="text-white font-bold text-sm tracking-wide">Absence</span>
+            <span className="text-white font-extrabold text-2xl tracking-wide">StaffOut</span>
             {org?.name && (
-              <span className="text-white/60 text-sm">· {org.name}</span>
+              <span className="text-indigo-200 text-sm font-medium mt-1">{org.name}</span>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-white">Report your absence</h1>
-          <p className="text-indigo-200 text-sm mt-1">
+          {/* Step context */}
+          <h1 className="text-xl font-bold text-white mb-1">Report your absence</h1>
+          <p className="text-indigo-200 text-sm">
             {step === 'email' && 'Enter your work email to get started'}
             {step === 'code' && 'Enter the code sent to your email'}
             {step === 'pick' && 'Select your name to continue'}
@@ -234,7 +236,7 @@ function SubmitForm() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-8">
+      <div className="max-w-lg mx-auto px-4 -mt-10">
 
         {/* ── Step 1: Email ── */}
         {step === 'email' && (
