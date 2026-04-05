@@ -45,6 +45,48 @@ const ORG_LOGOS: Record<string, string> = {
   wva: '/WVA.jfif',
 }
 
+// Full school names — overrides whatever short name is stored in the database
+const ORG_FULL_NAMES: Record<string, string> = {
+  hba: 'Harvest Best Academy',
+  spa: 'Sankofa Prep',
+  wva: 'Wakanda Virtual Academy',
+}
+
+function SchoolLogo({ orgSlug, orgName }: { orgSlug: string | null; orgName: string | null }) {
+  const [imgError, setImgError] = useState(false)
+  const logoSrc = orgSlug ? ORG_LOGOS[orgSlug] : null
+
+  if (logoSrc && !imgError) {
+    return (
+      <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white flex items-center justify-center mb-2 shadow-lg">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          alt={orgName ?? orgSlug ?? 'School logo'}
+          className="w-full h-full object-contain p-1.5"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    )
+  }
+
+  if (orgSlug && ORG_FULL_NAMES[orgSlug]) {
+    // Initials fallback
+    const initials = orgSlug.toUpperCase()
+    return (
+      <div className="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center mb-2 shadow-lg">
+        <span className="text-white font-black text-2xl tracking-wider">{initials}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-2 shadow-lg">
+      <Zap className="w-9 h-9 text-white" />
+    </div>
+  )
+}
+
 export default function SubmitPage() {
   return (
     <Suspense>
@@ -241,24 +283,11 @@ function SubmitForm() {
         <div className="max-w-lg mx-auto">
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
-            {orgSlug && ORG_LOGOS[orgSlug] ? (
-              // School logo from /public
-              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white flex items-center justify-center mb-3 shadow-lg">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={ORG_LOGOS[orgSlug]}
-                  alt={org?.name ?? orgSlug}
-                  className="w-full h-full object-contain p-1"
-                />
-              </div>
-            ) : (
-              // Default: Zap icon for demo and unknown orgs
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
-                <Zap className="w-9 h-9 text-white" />
-              </div>
-            )}
-            <span className="text-white font-extrabold text-2xl tracking-wide">
-              {orgSlug && ORG_LOGOS[orgSlug] && org?.name ? org.name : 'Absence'}
+            <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
+            <span className="text-white font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
+              {orgSlug && ORG_FULL_NAMES[orgSlug]
+                ? ORG_FULL_NAMES[orgSlug]
+                : 'Absence'}
             </span>
           </div>
           {/* Step context */}
