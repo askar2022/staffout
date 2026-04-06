@@ -1,5 +1,6 @@
 import { Clock, Mail, Zap } from 'lucide-react'
 import Link from 'next/link'
+import SignOutButton from './SignOutButton'
 
 export default function PendingPage() {
   return (
@@ -43,10 +44,11 @@ export default function PendingPage() {
           </a>
         </p>
 
-        <div className="mt-8 pt-6 border-t border-slate-200">
+        <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-3">
           <Link href="/login" className="text-sm text-slate-500 hover:text-slate-700">
             ← Back to sign in
           </Link>
+          <SignOutButton />
         </div>
       </div>
     </div>
