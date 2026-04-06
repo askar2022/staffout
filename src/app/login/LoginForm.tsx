@@ -34,11 +34,9 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
       return
     }
 
-    // If on root domain, redirect to superadmin (page handles auth check)
-    // Non-superadmins get redirected to their org subdomain from there
+    // If on root domain, hard redirect to superadmin so cookies are fully sent
     if (!orgSlug) {
-      router.push('/superadmin')
-      router.refresh()
+      window.location.href = '/superadmin'
       return
     }
 
