@@ -50,11 +50,31 @@ export default function SuperAdminPage() {
     fetch('/api/superadmin')
       .then((r) => r.json())
       .then((data) => {
-        if (data.error) setError(data.error)
-        else setOrgs(data.organizations ?? [])
+        if (data.error) {
+          // Not superadmin — redirect to their org subdomain if they have one
+          if (data.error === 'Forbidden') {
+            fetch('/api/public/my-org')
+              .then((r) => r.ok ? r.json() : null)
+              .then((orgData) => {
+                if (orgData?.slug) {
+                  const protocol = window.location.protocol
+                  window.location.href = `${protocol}//${orgData.slug}.${ROOT_DOMAIN}/dashboard`
+                } else {
+                  setError(data.error)
+                  setLoading(false)
+                }
+              })
+              .catch(() => { setError(data.error); setLoading(false) })
+          } else {
+            setError(data.error)
+            setLoading(false)
+          }
+        } else {
+          setOrgs(data.organizations ?? [])
+          setLoading(false)
+        }
       })
-      .catch(() => setError('Failed to load'))
-      .finally(() => setLoading(false))
+      .catch(() => { setError('Failed to load'); setLoading(false) })
   }, [])
 
   async function handleAction(orgId: string, action: 'approved' | 'rejected') {
