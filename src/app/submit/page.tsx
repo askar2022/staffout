@@ -287,7 +287,7 @@ function SubmitForm() {
             <span className="text-white font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
               {orgSlug && ORG_FULL_NAMES[orgSlug]
                 ? ORG_FULL_NAMES[orgSlug]
-                : 'Out of Shift'}
+                : 'Outofshift'}
             </span>
           </div>
           {/* Step context */}
