@@ -37,9 +37,10 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
     // If on root domain and user has an org, redirect them to their subdomain
     if (!orgSlug) {
       const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-      const isSuperAdmin = data.user.email === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL
 
-      if (isSuperAdmin) {
+      // Check if superadmin via API (avoids needing NEXT_PUBLIC_ env var)
+      const saCheck = await fetch('/api/superadmin')
+      if (saCheck.ok) {
         router.push('/superadmin')
         router.refresh()
         return
