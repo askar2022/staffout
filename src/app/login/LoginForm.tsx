@@ -69,7 +69,9 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
     setResetLoading(true)
     setError('')
     const supabase = createClient()
-    const redirectTo = `${window.location.origin}/login`
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+    const protocol = window.location.protocol
+    const redirectTo = `${protocol}//${rootDomain}/auth/callback?next=/auth/reset-password`
     await supabase.auth.resetPasswordForEmail(email, { redirectTo })
     setResetSent(true)
     setResetLoading(false)
