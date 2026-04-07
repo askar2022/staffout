@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   supervisor_name: '',
   supervisor_email: '',
   pto_balance: '',
+  employee_id: '',
 }
 
 export default function StaffManager({ initialStaff }: Props) {
@@ -159,6 +160,7 @@ export default function StaffManager({ initialStaff }: Props) {
       supervisor_name: member.supervisor_name ?? '',
       supervisor_email: member.supervisor_email ?? '',
       pto_balance: member.pto_balance !== null && member.pto_balance !== undefined ? String(member.pto_balance) : '',
+      employee_id: member.employee_id ?? '',
     })
     setShowForm(true)
     setError('')
@@ -332,6 +334,7 @@ export default function StaffManager({ initialStaff }: Props) {
             {[
               { key: 'full_name', label: 'Full name *', placeholder: 'Ms. Johnson', type: 'text' },
               { key: 'email', label: 'Work email *', placeholder: 'name@school.org', type: 'email' },
+              { key: 'employee_id', label: 'Employee ID', placeholder: 'e.g. EMP-1042', type: 'text' },
               { key: 'position', label: 'Position / Role', placeholder: 'Math Teacher', type: 'text' },
               { key: 'campus', label: 'Campus / Site', placeholder: 'Main Campus', type: 'text' },
               { key: 'supervisor_name', label: 'Supervisor name', placeholder: 'Mr. Ahmed', type: 'text' },
@@ -442,6 +445,9 @@ export default function StaffManager({ initialStaff }: Props) {
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-slate-900">{member.full_name}</p>
                     {member.email && <p className="text-xs text-slate-400">{member.email}</p>}
+                    {member.employee_id && (
+                      <p className="text-xs text-slate-400 font-mono">ID: {member.employee_id}</p>
+                    )}
                     {showArchived && <span className="text-xs text-amber-600 font-medium">Archived</span>}
                   </td>
                   <td className="px-5 py-4 hidden sm:table-cell">

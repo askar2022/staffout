@@ -9,7 +9,7 @@ export async function GET() {
 
     const { data, error } = await db
       .from('staff_members')
-      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, created_at')
+      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, employee_id, created_at')
       .eq('organization_id', orgId)
       .eq('is_active', true)
       .order('full_name')
@@ -47,9 +47,10 @@ export async function POST(request: NextRequest) {
         campus: sanitize(body.campus, 100) || null,
         supervisor_name: sanitize(body.supervisor_name, 100) || null,
         supervisor_email: supervisorEmail || null,
+        employee_id: sanitize(body.employee_id, 50) || null,
         is_active: true,
       })
-      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, created_at')
+      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, employee_id, created_at')
       .single()
 
     if (error) return apiError('Failed to add staff member', 500)

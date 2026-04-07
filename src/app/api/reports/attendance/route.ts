@@ -32,33 +32,88 @@ export async function GET(request: NextRequest) {
 
     const submissions = (data ?? []) as Submission[]
 
+    // Collect unique staff_ids from submissions
+    const staffIds = [...new Set(submissions.map((s) => s.staff_id).filter(Boolean))] as string[]
+
+    // Fetch staff member info (employee_id, pto_balance) for those IDs
+    const staffInfoMap: Record<string, { employee_id: string | null; pto_balance: number | null }> = {}
+
+    if (staffIds.length > 0) {
+      const { data: staffRows } = await db
+        .from('staff_members')
+        .select('id, employee_id, pto_balance')
+        .in('id', staffIds)
+
+      for (const row of staffRows ?? []) {
+        staffInfoMap[row.id] = { employee_id: row.employee_id, pto_balance: row.pto_balance }
+      }
+
+      // Fetch all-time PTO used per staff_id (across all submissions, not just this period)
+      const { data: allPtoRows } = await db
+        .from('submissions')
+        .select('staff_id, pto_hours_deducted')
+        .eq('organization_id', orgId)
+        .in('staff_id', staffIds)
+        .not('pto_hours_deducted', 'is', null)
+
+      const ptoUsedTotal: Record<string, number> = {}
+      for (const row of allPtoRows ?? []) {
+        if (row.staff_id) {
+          ptoUsedTotal[row.staff_id] = (ptoUsedTotal[row.staff_id] ?? 0) + (row.pto_hours_deducted ?? 0)
+        }
+      }
+
+      for (const id of staffIds) {
+        (staffInfoMap[id] as { employee_id: string | null; pto_balance: number | null; pto_used_total?: number }).pto_used_total = ptoUsedTotal[id] ?? 0
+      }
+    }
+
     // Group by staff name → count by type
     interface StaffEntry {
       name: string
+      staff_id: string | null
+      employee_id: string | null
       absent: number
       late: number
       leaving_early: number
       appointment: number
       personal_day: number
       total: number
-      dates: { date: string; status: string }[]
+      pto_used_period: number
+      pto_balance: number | null
+      pto_remaining: number | null
+      dates: { date: string; status: string; pto_hours?: number | null }[]
     }
 
     const byStaff: Record<string, StaffEntry> = {}
 
     for (const s of submissions) {
       if (!byStaff[s.staff_name]) {
+        const info = s.staff_id ? staffInfoMap[s.staff_id] : null
+        const balance = info?.pto_balance ?? null
+        const usedTotal = s.staff_id
+          ? ((staffInfoMap[s.staff_id] as { pto_used_total?: number })?.pto_used_total ?? 0)
+          : 0
+        const remaining = balance !== null ? balance - usedTotal : null
+
         byStaff[s.staff_name] = {
           name: s.staff_name,
+          staff_id: s.staff_id ?? null,
+          employee_id: info?.employee_id ?? null,
           absent: 0, late: 0, leaving_early: 0, appointment: 0, personal_day: 0, total: 0,
+          pto_used_period: 0,
+          pto_balance: balance,
+          pto_remaining: remaining,
           dates: [],
         }
       }
+
       const entry = byStaff[s.staff_name]
       const statusKey = s.status as 'absent' | 'late' | 'leaving_early' | 'appointment' | 'personal_day'
       if (statusKey in entry) entry[statusKey]++
       entry.total++
-      entry.dates.push({ date: s.date, status: s.status })
+      if (s.pto_hours_deducted) entry.pto_used_period += s.pto_hours_deducted
+      entry.dates.push({ date: s.date, status: s.status, pto_hours: s.pto_hours_deducted })
     }
 
     return apiOk({

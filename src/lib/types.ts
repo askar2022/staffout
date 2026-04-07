@@ -44,6 +44,7 @@ export interface StaffMember {
   supervisor_email: string | null
   is_active: boolean
   pto_balance: number | null
+  employee_id: string | null
   created_at: string
 }
 

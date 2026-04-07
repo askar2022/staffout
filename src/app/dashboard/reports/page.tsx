@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, Fragment } from 'react'
-import { FileText, Search, Download, Printer, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
+import { FileText, Search, Download, Printer, ChevronDown, ChevronUp, BarChart2, Clock } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   absent: 'Absent',
@@ -21,13 +21,18 @@ const STATUS_COLORS: Record<string, string> = {
 
 interface StaffReport {
   name: string
+  staff_id: string | null
+  employee_id: string | null
   absent: number
   late: number
   leaving_early: number
   appointment: number
   personal_day: number
   total: number
-  dates: { date: string; status: string }[]
+  pto_used_period: number
+  pto_balance: number | null
+  pto_remaining: number | null
+  dates: { date: string; status: string; pto_hours?: number | null }[]
 }
 
 function getDefaultRange() {
@@ -65,11 +70,27 @@ export default function ReportsPage() {
     }
   }, [startDate, endDate, nameFilter])
 
+  const hasPto = staff.some((s) => s.pto_balance !== null)
+  const hasEmployeeId = staff.some((s) => s.employee_id)
+
   function exportCSV() {
+    const headers = [
+      ...(hasEmployeeId ? ['Employee ID'] : []),
+      'Staff Name',
+      'Absent', 'Late', 'Left Early', 'Appointment', 'Personal Day', 'Total',
+      ...(hasPto ? ['PTO Used (Period)', 'PTO Balance (Total)', 'PTO Remaining'] : []),
+    ]
     const rows = [
-      ['Staff Name', 'Absent', 'Late', 'Left Early', 'Appointment', 'Personal Day', 'Total'],
+      headers,
       ...staff.map((s) => [
-        s.name, s.absent, s.late, s.leaving_early, s.appointment, s.personal_day, s.total,
+        ...(hasEmployeeId ? [s.employee_id ?? ''] : []),
+        s.name,
+        s.absent, s.late, s.leaving_early, s.appointment, s.personal_day, s.total,
+        ...(hasPto ? [
+          s.pto_used_period > 0 ? s.pto_used_period : '',
+          s.pto_balance ?? '',
+          s.pto_remaining !== null ? s.pto_remaining : '',
+        ] : []),
       ]),
     ]
     const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
@@ -83,10 +104,21 @@ export default function ReportsPage() {
   }
 
   function exportDetailedCSV() {
-    const rows = [['Staff Name', 'Date', 'Status']]
+    const headers = [
+      ...(hasEmployeeId ? ['Employee ID'] : []),
+      'Staff Name', 'Date', 'Status',
+      ...(hasPto ? ['PTO Hours Deducted'] : []),
+    ]
+    const rows = [headers]
     for (const s of staff) {
       for (const d of s.dates) {
-        rows.push([s.name, d.date, STATUS_LABELS[d.status] ?? d.status])
+        rows.push([
+          ...(hasEmployeeId ? [s.employee_id ?? ''] : []),
+          s.name,
+          d.date,
+          STATUS_LABELS[d.status] ?? d.status,
+          ...(hasPto ? [d.pto_hours ? String(d.pto_hours) : ''] : []),
+        ])
       }
     }
     const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
@@ -243,6 +275,14 @@ export default function ReportsPage() {
                     <th className="text-center px-3 py-3 text-xs font-semibold text-blue-500 uppercase tracking-wide">Appt</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-teal-500 uppercase tracking-wide">Personal</th>
                     <th className="text-center px-5 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wide">Total</th>
+                    {hasPto && (
+                      <>
+                        <th className="text-center px-3 py-3 text-xs font-semibold text-indigo-500 uppercase tracking-wide hidden lg:table-cell">
+                          <span className="flex items-center justify-center gap-1"><Clock className="w-3 h-3" />PTO Used</span>
+                        </th>
+                        <th className="text-center px-3 py-3 text-xs font-semibold text-green-600 uppercase tracking-wide hidden lg:table-cell">PTO Left</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -257,7 +297,12 @@ export default function ReportsPage() {
                             {expandedName === s.name
                               ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
                               : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                            <span className="text-sm font-semibold text-slate-900">{s.name}</span>
+                            <div>
+                              <span className="text-sm font-semibold text-slate-900">{s.name}</span>
+                              {s.employee_id && (
+                                <p className="text-xs text-slate-400 font-mono">ID: {s.employee_id}</p>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-3.5 text-center">
@@ -278,12 +323,32 @@ export default function ReportsPage() {
                         <td className="px-5 py-3.5 text-center">
                           <span className="text-sm font-black text-slate-900">{s.total}</span>
                         </td>
+                        {hasPto && (
+                          <>
+                            <td className="px-3 py-3.5 text-center hidden lg:table-cell">
+                              {s.pto_used_period > 0 ? (
+                                <span className="text-sm font-semibold text-indigo-600">{s.pto_used_period}h</span>
+                              ) : (
+                                <span className="text-sm text-slate-300">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center hidden lg:table-cell">
+                              {s.pto_remaining !== null ? (
+                                <span className={`text-sm font-semibold ${
+                                  s.pto_remaining <= 0 ? 'text-red-600' : s.pto_remaining <= 16 ? 'text-amber-600' : 'text-green-600'
+                                }`}>{s.pto_remaining}h</span>
+                              ) : (
+                                <span className="text-sm text-slate-300">—</span>
+                              )}
+                            </td>
+                          </>
+                        )}
                       </tr>
 
                       {/* Expanded detail rows */}
                       {expandedName === s.name && (
                         <tr>
-                          <td colSpan={7} className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+                          <td colSpan={hasPto ? 9 : 7} className="px-5 py-3 bg-slate-50 border-b border-slate-200">
                             <div className="flex flex-wrap gap-2">
                               {s.dates.map((d, i) => (
                                 <span
