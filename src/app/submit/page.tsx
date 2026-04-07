@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react'
+import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Paperclip, X, CalendarRange } from 'lucide-react'
 import type { SubmissionStatus } from '@/lib/types'
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
@@ -148,6 +148,20 @@ function SubmitForm() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
+  // Multi-day
+  const [isMultiDay, setIsMultiDay] = useState(false)
+  const [endDate, setEndDate] = useState('')
+
+  // Lesson plan
+  const lessonPlanRef = useRef<HTMLInputElement>(null)
+  const [lessonPlanFile, setLessonPlanFile] = useState<File | null>(null)
+  const [lessonPlanUrl, setLessonPlanUrl] = useState<string | null>(null)
+  const [uploadingPlan, setUploadingPlan] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  // PTO balance
+  const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null } | null>(null)
+
   const isAfter8AM = new Date().getHours() >= 8
 
   async function handleSendCode(e: React.FormEvent) {
@@ -193,9 +207,34 @@ function SubmitForm() {
         setStaffList(data.staffList)
         setStep('pick')
       } else {
-        setVerifiedStaff(data.staff ?? (data.staffList?.[0] ?? null))
+        const staff = data.staff ?? (data.staffList?.[0] ?? null)
+        setVerifiedStaff(staff)
+        if (staff?.id && data.org?.id) {
+          fetch(`/api/pto?staff_id=${staff.id}&org_id=${data.org.id}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((d) => { if (d) setPtoInfo(d) })
+            .catch(() => {})
+        }
         setStep('form')
       }
+    }
+  }
+
+  async function handleLessonPlanUpload(file: File) {
+    if (!org?.id) return
+    setUploadingPlan(true)
+    setUploadError('')
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('org_id', org.id)
+    const res = await fetch('/api/lesson-plan/upload', { method: 'POST', body: fd })
+    const data = await res.json()
+    setUploadingPlan(false)
+    if (!res.ok) {
+      setUploadError(data.error || 'Upload failed')
+      setLessonPlanFile(null)
+    } else {
+      setLessonPlanUrl(data.url)
     }
   }
 
@@ -219,10 +258,12 @@ function SubmitForm() {
         supervisor_name: verifiedStaff?.supervisor_name ?? null,
         status,
         date: new Date().toISOString().split('T')[0],
+        end_date: isMultiDay && endDate ? endDate : null,
         expected_arrival: status === 'late' ? expectedArrival : null,
         leave_time: (status === 'leaving_early' || status === 'appointment') ? leaveTime : null,
         reason_category: reasonCategory || null,
         notes: notes || null,
+        lesson_plan_url: lessonPlanUrl || null,
       }),
     })
 
@@ -254,6 +295,15 @@ function SubmitForm() {
             <span className="font-medium">{verifiedStaff?.full_name ?? email}</span>
             {status && <> · <span className="text-indigo-600">{STATUS_LABELS[status as SubmissionStatus]}</span></>}
           </div>
+          {ptoInfo?.balance !== null && ptoInfo !== null && (
+            <div className="mt-3 py-2.5 px-4 bg-indigo-50 rounded-xl text-sm text-indigo-700 flex items-center gap-2">
+              <Clock className="w-4 h-4 shrink-0" />
+              <span>
+                <span className="font-semibold">{Math.max(0, (ptoInfo.remaining ?? 0))}h PTO remaining</span>
+                {' '}after this submission
+              </span>
+            </div>
+          )}
           <button
             onClick={() => {
               setStep('email')
@@ -266,6 +316,11 @@ function SubmitForm() {
               setReasonCategory('')
               setExpectedArrival('')
               setLeaveTime('')
+              setIsMultiDay(false)
+              setEndDate('')
+              setLessonPlanFile(null)
+              setLessonPlanUrl(null)
+              setPtoInfo(null)
             }}
             className="mt-5 text-sm text-indigo-600 font-medium hover:underline"
           >
@@ -427,6 +482,12 @@ function SubmitForm() {
                     type="button"
                     onClick={() => {
                       setVerifiedStaff(s)
+                      if (s?.id && org?.id) {
+                        fetch(`/api/pto?staff_id=${s.id}&org_id=${org.id}`)
+                          .then((r) => r.ok ? r.json() : null)
+                          .then((d) => { if (d) setPtoInfo(d) })
+                          .catch(() => {})
+                      }
                       setStep('form')
                     }}
                     className="flex items-start gap-3 p-4 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
@@ -449,6 +510,27 @@ function SubmitForm() {
         {/* ── Step 3: Absence Form ── */}
         {step === 'form' && (
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+
+            {/* PTO balance banner — only show if balance is set */}
+            {ptoInfo?.balance !== null && ptoInfo !== null && (
+              <div className={`border-b px-5 py-3 flex items-center gap-2 ${
+                (ptoInfo.remaining ?? 0) <= 0
+                  ? 'bg-red-50 border-red-100'
+                  : (ptoInfo.remaining ?? 0) <= 16
+                  ? 'bg-amber-50 border-amber-100'
+                  : 'bg-indigo-50 border-indigo-100'
+              }`}>
+                <Clock className={`w-4 h-4 shrink-0 ${
+                  (ptoInfo.remaining ?? 0) <= 0 ? 'text-red-500' : (ptoInfo.remaining ?? 0) <= 16 ? 'text-amber-500' : 'text-indigo-500'
+                }`} />
+                <p className="text-sm">
+                  <span className="font-semibold">
+                    {ptoInfo.remaining !== null ? `${ptoInfo.remaining}h PTO remaining` : '—'}
+                  </span>
+                  <span className="text-slate-500 ml-1">({ptoInfo.used}h used of {ptoInfo.balance}h)</span>
+                </p>
+              </div>
+            )}
 
             {/* Verified identity banner */}
             <div className="bg-green-50 border-b border-green-100 px-5 py-3 flex items-center gap-2">
@@ -551,6 +633,49 @@ function SubmitForm() {
                 <p className="text-xs text-slate-400 mt-1">Only visible to your supervisor and admin.</p>
               </div>
 
+              {/* Multi-day toggle — only for absent and personal_day */}
+              {(status === 'absent' || status === 'personal_day') && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1">
+                    <CalendarRange className="w-4 h-4" />
+                    Duration
+                  </label>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsMultiDay(false)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        !isMultiDay ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Single day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsMultiDay(true)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        isMultiDay ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Multiple days
+                    </button>
+                  </div>
+                  {isMultiDay && (
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Last day of absence</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="text-xs text-slate-400 mt-1">Weekends are excluded automatically.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Notes */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -566,6 +691,57 @@ function SubmitForm() {
                 />
                 <p className="text-xs text-slate-400 mt-1">Private — shared only with your supervisor and admin.</p>
               </div>
+
+              {/* Lesson plan upload — teachers only */}
+              {verifiedStaff?.position?.toLowerCase().includes('teacher') && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1">
+                    <Paperclip className="w-4 h-4" />
+                    Lesson Plan <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  {uploadError && (
+                    <p className="text-xs text-red-600 mb-2">{uploadError}</p>
+                  )}
+                  {lessonPlanFile ? (
+                    <div className="flex items-center gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <Paperclip className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <span className="text-sm text-indigo-700 flex-1 truncate">{lessonPlanFile.name}</span>
+                      {uploadingPlan ? (
+                        <span className="text-xs text-slate-500">Uploading...</span>
+                      ) : lessonPlanUrl ? (
+                        <span className="text-xs text-green-600 font-medium">✓ Uploaded</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => { setLessonPlanFile(null); setLessonPlanUrl(null); setUploadError('') }}
+                        className="text-slate-400 hover:text-red-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => lessonPlanRef.current?.click()}
+                      className="w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-4 text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                    >
+                      Click to upload PDF, Word, or image (max 10 MB)
+                    </button>
+                  )}
+                  <input
+                    ref={lessonPlanRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) { setLessonPlanFile(f); handleLessonPlanUpload(f) }
+                      e.target.value = ''
+                    }}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Your supervisor will receive a download link in their alert email.</p>
+                </div>
+              )}
             </div>
 
             <div className="px-6 pb-6">

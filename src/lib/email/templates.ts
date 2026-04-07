@@ -392,7 +392,14 @@ export function buildSupervisorEmail(
         ${timeDetail ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Time</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${timeDetail}</td></tr>` : ''}
         ${submission.reason_category ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Reason</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td></tr>` : ''}
         ${submission.notes ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:8px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
+        ${submission.end_date ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Through</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.end_date}</td></tr>` : ''}
       </table>
+      ${submission.lesson_plan_url ? `
+        <div style="margin-top:20px;padding:16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#3730a3;">📎 Lesson Plan Attached</p>
+          <a href="${submission.lesson_plan_url}" style="display:inline-block;background:#4f46e5;color:#ffffff;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;text-decoration:none;">Download Lesson Plan</a>
+        </div>
+      ` : ''}
     </div>
 
     <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #f3f4f6;">

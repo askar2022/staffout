@@ -43,12 +43,14 @@ export interface StaffMember {
   supervisor_name: string | null
   supervisor_email: string | null
   is_active: boolean
+  pto_balance: number | null
   created_at: string
 }
 
 export interface Submission {
   id: string
   organization_id: string
+  staff_id: string | null
   staff_name: string
   staff_email: string | null
   position: string | null
@@ -57,13 +59,23 @@ export interface Submission {
   supervisor_name: string | null
   status: SubmissionStatus
   date: string
+  end_date: string | null
   expected_arrival: string | null
   leave_time: string | null
   reason_category: ReasonCategory | null
   notes: string | null
+  pto_hours_deducted: number | null
+  lesson_plan_url: string | null
   submitted_at: string
   summary_included: boolean
   instant_sent: boolean
+}
+
+export interface PtoDeductionSetting {
+  id: string
+  organization_id: string
+  status: SubmissionStatus
+  hours_per_day: number
 }
 
 export interface NotificationRecipient {

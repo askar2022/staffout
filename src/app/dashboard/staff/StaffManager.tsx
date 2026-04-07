@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw, RefreshCw, Clock } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
 
 interface Props {
@@ -16,6 +16,7 @@ const EMPTY_FORM = {
   campus: '',
   supervisor_name: '',
   supervisor_email: '',
+  pto_balance: '',
 }
 
 export default function StaffManager({ initialStaff }: Props) {
@@ -157,6 +158,7 @@ export default function StaffManager({ initialStaff }: Props) {
       campus: member.campus ?? '',
       supervisor_name: member.supervisor_name ?? '',
       supervisor_email: member.supervisor_email ?? '',
+      pto_balance: member.pto_balance !== null && member.pto_balance !== undefined ? String(member.pto_balance) : '',
     })
     setShowForm(true)
     setError('')
@@ -181,7 +183,10 @@ export default function StaffManager({ initialStaff }: Props) {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        pto_balance: form.pto_balance !== '' ? Number(form.pto_balance) : null,
+      }),
     })
 
     const data = await res.json()
@@ -343,6 +348,20 @@ export default function StaffManager({ initialStaff }: Props) {
                 />
               </div>
             ))}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                PTO Balance (hours) <span className="text-slate-400 font-normal">— leave blank if not tracked</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={form.pto_balance}
+                onChange={(e) => setForm((prev) => ({ ...prev, pto_balance: e.target.value }))}
+                placeholder="e.g. 80"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2 mt-4">
@@ -411,6 +430,9 @@ export default function StaffManager({ initialStaff }: Props) {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Position</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Supervisor</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Campus</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />PTO Hours</span>
+                </th>
                 <th className="px-5 py-3.5" />
               </tr>
             </thead>
@@ -437,6 +459,16 @@ export default function StaffManager({ initialStaff }: Props) {
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell">
                     <p className="text-sm text-slate-600">{member.campus || '—'}</p>
+                  </td>
+                  <td className="px-5 py-4 hidden xl:table-cell">
+                    {member.pto_balance !== null && member.pto_balance !== undefined ? (
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        <Clock className="w-3 h-3" />
+                        {member.pto_balance}h
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1 justify-end">

@@ -28,8 +28,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         .update({ is_active: body.is_active })
         .eq('id', id)
         .eq('organization_id', orgId)
-        .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, created_at')
-        .single()
+      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, created_at')
+      .single()
       if (error) return apiError('Failed to update staff member', 500)
       return apiOk({ member: data })
     }
@@ -44,6 +44,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const supervisorEmail = sanitize(body.supervisor_email, 200)
     if (supervisorEmail && !isValidEmail(supervisorEmail)) return apiError('Invalid supervisor email')
 
+    const ptoBalance = body.pto_balance !== undefined
+      ? (body.pto_balance === '' || body.pto_balance === null ? null : Number(body.pto_balance))
+      : undefined
+
     const { data, error } = await db
       .from('staff_members')
       .update({
@@ -53,10 +57,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         campus: sanitize(body.campus, 100) || null,
         supervisor_name: sanitize(body.supervisor_name, 100) || null,
         supervisor_email: supervisorEmail || null,
+        ...(ptoBalance !== undefined ? { pto_balance: ptoBalance } : {}),
       })
       .eq('id', id)
       .eq('organization_id', orgId)
-      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, created_at')
+      .select('id, full_name, email, position, campus, supervisor_name, supervisor_email, is_active, pto_balance, created_at')
       .single()
 
     if (error) return apiError('Failed to update staff member', 500)

@@ -47,6 +47,7 @@ create table if not exists staff_members (
   supervisor_name text,
   supervisor_email text,
   is_active boolean default true,
+  pto_balance numeric default null,
   created_at timestamptz default now()
 );
 
@@ -54,6 +55,7 @@ create table if not exists staff_members (
 create table if not exists submissions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references organizations(id) on delete cascade,
+  staff_id uuid references staff_members(id) on delete set null,
   staff_name text not null,
   staff_email text,
   position text,
@@ -62,13 +64,26 @@ create table if not exists submissions (
   supervisor_name text,
   status text not null check (status in ('absent', 'late', 'leaving_early', 'appointment', 'personal_day')),
   date date not null default current_date,
+  end_date date default null,
   expected_arrival text,
   leave_time text,
   reason_category text check (reason_category in ('sick', 'personal', 'family', 'medical', 'other')),
   notes text,
+  pto_hours_deducted numeric default null,
+  lesson_plan_url text default null,
   submitted_at timestamptz default now(),
   summary_included boolean default false,
   instant_sent boolean default false
+);
+
+-- PTO deduction settings per organization
+create table if not exists pto_deduction_settings (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  status text not null,
+  hours_per_day numeric not null default 0,
+  created_at timestamptz default now(),
+  unique(organization_id, status)
 );
 
 -- Email logs

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, Check, Mail, Building2, Clock, ShieldCheck } from 'lucide-react'
-import type { NotificationRecipient, Organization } from '@/lib/types'
+import type { NotificationRecipient, Organization, PtoDeductionSetting } from '@/lib/types'
 
 interface Props {
   org: Organization
@@ -23,6 +23,32 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
   const [newRecipient, setNewRecipient] = useState({ name: '', email: '', type: 'admin' as const })
   const [addingRecipient, setAddingRecipient] = useState(false)
   const [recipientError, setRecipientError] = useState('')
+
+  // PTO deduction settings
+  const [ptoSettings, setPtoSettings] = useState<PtoDeductionSetting[]>([])
+  const [savingPto, setSavingPto] = useState(false)
+  const [ptoSaved, setPtoSaved] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/pto-settings')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.settings) setPtoSettings(data.settings) })
+      .catch(() => {})
+  }, [])
+
+  async function savePtoSettings() {
+    setSavingPto(true)
+    const res = await fetch('/api/pto-settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: ptoSettings }),
+    })
+    setSavingPto(false)
+    if (res.ok) {
+      setPtoSaved(true)
+      setTimeout(() => setPtoSaved(false), 2000)
+    }
+  }
 
   async function saveOrgSettings() {
     setSavingOrg(true)
@@ -158,6 +184,63 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
         >
           <Check className="w-4 h-4" />
           {orgSaved ? 'Saved!' : savingOrg ? 'Saving...' : 'Save settings'}
+        </button>
+      </div>
+
+      {/* PTO deduction settings */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-1">
+          <Clock className="w-4 h-4 text-slate-500" />
+          PTO Deduction Rules
+        </h2>
+        <p className="text-sm text-slate-500 mb-5">
+          How many hours are automatically deducted per day for each absence type.
+        </p>
+
+        {ptoSettings.length === 0 ? (
+          <p className="text-sm text-slate-400">Loading...</p>
+        ) : (
+          <div className="space-y-3">
+            {ptoSettings.map((s) => {
+              const labels: Record<string, string> = {
+                absent: 'Absent (full day)',
+                personal_day: 'Personal Day',
+                late: 'Late Arrival',
+                leaving_early: 'Leaving Early',
+                appointment: 'Off-Campus Appointment',
+              }
+              return (
+                <div key={s.status} className="flex items-center gap-4">
+                  <label className="text-sm text-slate-700 w-52 shrink-0">{labels[s.status] ?? s.status}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="24"
+                      step="0.5"
+                      value={s.hours_per_day}
+                      onChange={(e) => setPtoSettings((prev) =>
+                        prev.map((p) => p.status === s.status ? { ...p, hours_per_day: Number(e.target.value) } : p)
+                      )}
+                      className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                    />
+                    <span className="text-sm text-slate-500">hours / day</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <button
+          onClick={savePtoSettings}
+          disabled={savingPto || ptoSettings.length === 0}
+          className={`mt-5 flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors ${
+            ptoSaved ? 'bg-green-100 text-green-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+          } disabled:opacity-60`}
+        >
+          <Check className="w-4 h-4" />
+          {ptoSaved ? 'Saved!' : savingPto ? 'Saving...' : 'Save PTO rules'}
         </button>
       </div>
 

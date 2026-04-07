@@ -87,6 +87,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Multi-day: validate end_date
+    const endDate = sanitize(body.end_date, 10) || null
+    if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return apiError('Invalid end_date format')
+
+    // Count weekdays between date and end_date (inclusive)
+    function countWeekdays(start: string, end: string | null): number {
+      if (!end || end <= start) return 1
+      let count = 0
+      const cur = new Date(start + 'T12:00:00Z')
+      const last = new Date(end + 'T12:00:00Z')
+      while (cur <= last) {
+        const day = cur.getUTCDay()
+        if (day !== 0 && day !== 6) count++
+        cur.setUTCDate(cur.getUTCDate() + 1)
+      }
+      return Math.max(1, count)
+    }
+
+    const numDays = countWeekdays(date, endDate)
+
+    // Auto-calculate PTO hours to deduct
+    let ptoHoursDeducted: number | null = null
+    if (staffId) {
+      const { data: ptoSetting } = await db
+        .from('pto_deduction_settings')
+        .select('hours_per_day')
+        .eq('organization_id', orgId)
+        .eq('status', status)
+        .single()
+
+      const hoursPerDay = ptoSetting?.hours_per_day ?? 0
+      if (hoursPerDay > 0) {
+        ptoHoursDeducted = hoursPerDay * numDays
+      }
+    }
+
+    // Lesson plan URL (already uploaded by client)
+    const lessonPlanUrl = sanitize(body.lesson_plan_url, 500) || null
+
     // Override campus if manually set (for unlisted staff)
     if (!campus) campus = sanitize(body.campus, 100) || null
 
@@ -94,6 +133,7 @@ export async function POST(request: NextRequest) {
       .from('submissions')
       .insert({
         organization_id: orgId,
+        staff_id: staffId || null,
         staff_name: staffName,
         staff_email: staffEmail,
         position,
@@ -102,10 +142,13 @@ export async function POST(request: NextRequest) {
         supervisor_name: supervisorName,
         status,
         date,
+        end_date: endDate,
         expected_arrival: sanitize(body.expected_arrival, 10) || null,
         leave_time: sanitize(body.leave_time, 10) || null,
         reason_category: reasonCategory || null,
         notes: sanitize(body.notes, 500) || null,
+        pto_hours_deducted: ptoHoursDeducted,
+        lesson_plan_url: lessonPlanUrl,
         instant_sent: false,
         summary_included: false,
       })
