@@ -3,15 +3,15 @@
 import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Paperclip, X, CalendarRange } from 'lucide-react'
-import type { SubmissionStatus } from '@/lib/types'
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
 
 type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
 
+/** Staff-facing form — Off-Campus & Personal Day removed per school request; HR can still log those in dashboard */
 const statusOptions: {
-  value: SubmissionStatus
+  value: 'absent' | 'late' | 'leaving_early'
   label: string
   color: string
   desc: string
@@ -19,8 +19,6 @@ const statusOptions: {
   { value: 'absent', label: 'Absent', color: 'border-red-300 bg-red-50 text-red-800', desc: 'Not coming in today' },
   { value: 'late', label: 'Late Arrival', color: 'border-amber-300 bg-amber-50 text-amber-800', desc: 'Coming in later than usual' },
   { value: 'leaving_early', label: 'Leaving Early', color: 'border-orange-300 bg-orange-50 text-orange-800', desc: 'Leaving before end of day' },
-  { value: 'appointment', label: 'Off-Campus Appointment', color: 'border-blue-300 bg-blue-50 text-blue-800', desc: 'Stepping out for an appointment' },
-  { value: 'personal_day', label: 'Personal Day', color: 'border-purple-300 bg-purple-50 text-purple-800', desc: 'Using a personal day' },
 ]
 
 interface VerifiedStaff {
@@ -140,7 +138,7 @@ function SubmitForm() {
       })
       .catch(() => {})
   }, [orgSlug])
-  const [status, setStatus] = useState<SubmissionStatus | ''>('')
+  const [status, setStatus] = useState<'' | 'absent' | 'late' | 'leaving_early'>('')
   const [expectedArrival, setExpectedArrival] = useState('')
   const [leaveTime, setLeaveTime] = useState('')
   const [reasonCategory, setReasonCategory] = useState('')
@@ -260,7 +258,7 @@ function SubmitForm() {
         date: new Date().toISOString().split('T')[0],
         end_date: isMultiDay && endDate ? endDate : null,
         expected_arrival: status === 'late' ? expectedArrival : null,
-        leave_time: (status === 'leaving_early' || status === 'appointment') ? leaveTime : null,
+        leave_time: status === 'leaving_early' ? leaveTime : null,
         reason_category: reasonCategory || null,
         notes: notes || null,
         lesson_plan_url: lessonPlanUrl || null,
@@ -293,7 +291,7 @@ function SubmitForm() {
           </p>
           <div className="mt-4 py-3 px-4 bg-slate-50 rounded-xl text-sm text-slate-600">
             <span className="font-medium">{verifiedStaff?.full_name ?? email}</span>
-            {status && <> · <span className="text-indigo-600">{STATUS_LABELS[status as SubmissionStatus]}</span></>}
+            {status && <> · <span className="text-indigo-600">{STATUS_LABELS[status]}</span></>}
           </div>
           {ptoInfo?.balance !== null && ptoInfo !== null && (
             <div className="mt-3 py-2.5 px-4 bg-indigo-50 rounded-xl text-sm text-indigo-700 flex items-center gap-2">
@@ -601,10 +599,10 @@ function SubmitForm() {
                 </div>
               )}
 
-              {(status === 'leaving_early' || status === 'appointment') && (
+              {status === 'leaving_early' && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    {status === 'leaving_early' ? 'Time leaving' : 'Time stepping out'}
+                    Time leaving
                   </label>
                   <input
                     type="time"
@@ -633,8 +631,8 @@ function SubmitForm() {
                 <p className="text-xs text-slate-400 mt-1">Only visible to your supervisor and admin.</p>
               </div>
 
-              {/* Multi-day toggle — only for absent and personal_day */}
-              {(status === 'absent' || status === 'personal_day') && (
+              {/* Multi-day toggle — only for absent */}
+              {status === 'absent' && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1">
                     <CalendarRange className="w-4 h-4" />
