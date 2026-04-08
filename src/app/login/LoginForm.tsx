@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -19,9 +19,21 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
   const [error, setError] = useState('')
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
+  const loginInFlight = useRef(false)
+
+  function formatAuthError(message: string | undefined): string {
+    if (!message) return 'Sign in failed'
+    const lower = message.toLowerCase()
+    if (lower.includes('rate limit') || lower.includes('too many requests')) {
+      return 'Too many sign-in attempts were detected. Wait 10–15 minutes, then try again. If this keeps happening in Chrome, close other OutOfShift tabs, turn off extensions, or try another browser.'
+    }
+    return message
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    if (loginInFlight.current || loading) return
+    loginInFlight.current = true
     setLoading(true)
     setError('')
 
@@ -29,8 +41,9 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError || !data.user) {
-      setError(authError?.message ?? 'Sign in failed')
+      setError(formatAuthError(authError?.message))
       setLoading(false)
+      loginInFlight.current = false
       return
     }
 
