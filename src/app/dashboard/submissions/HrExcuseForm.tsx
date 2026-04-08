@@ -8,8 +8,6 @@ const STATUS_OPTIONS = [
   { value: 'absent', label: 'Absent (Full Day)' },
   { value: 'late', label: 'Late Arrival' },
   { value: 'leaving_early', label: 'Leaving Early' },
-  { value: 'appointment', label: 'Off-Campus Appointment' },
-  { value: 'personal_day', label: 'Personal Day' },
 ]
 
 const REASON_OPTIONS = [
