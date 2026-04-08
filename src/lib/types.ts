@@ -67,6 +67,8 @@ export interface Submission {
   notes: string | null
   pto_hours_deducted: number | null
   lesson_plan_url: string | null
+  hr_excused: boolean
+  hr_note: string | null
   submitted_at: string
   summary_included: boolean
   instant_sent: boolean

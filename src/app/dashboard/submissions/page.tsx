@@ -6,6 +6,7 @@ import type { Submission } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 import TestSummaryButton from './TestSummaryButton'
 import TestWeeklyReportButton from './TestWeeklyReportButton'
+import HrExcuseButton from './SubmissionsClient'
 
 export default async function SubmissionsPage({
   searchParams,
@@ -37,6 +38,7 @@ export default async function SubmissionsPage({
           <p className="text-slate-500 text-sm mt-1">All staff absence reports</p>
         </div>
         <div className="flex flex-col sm:flex-row items-end gap-3">
+          <HrExcuseButton />
           <TestWeeklyReportButton />
           <TestSummaryButton />
           <form className="flex items-center gap-2">
@@ -82,6 +84,11 @@ export default async function SubmissionsPage({
                     <p className="text-sm font-semibold text-slate-900">{s.staff_name}</p>
                     {s.position && <p className="text-xs text-slate-400">{s.position}</p>}
                     {s.campus && <p className="text-xs text-slate-400">{s.campus}</p>}
+                    {s.hr_excused && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                        🔖 HR Excused
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLORS[s.status]}`}>

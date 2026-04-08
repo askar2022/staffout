@@ -90,6 +90,94 @@ export function buildConfirmationEmail(
   return { subject, html, text }
 }
 
+// ── HR Excuse Accountability Email (to the staff member) ─────────────────────
+
+export function buildHrExcuseEmail(
+  orgName: string,
+  submission: Submission
+): { subject: string; html: string; text: string } {
+  const statusLabel = STATUS_LABELS[submission.status] ?? submission.status
+  const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+
+  const subject = `HR Notice — Your absence on ${dateStr} has been recorded`
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+    <div style="background:#7c3aed;height:5px;"></div>
+
+    <div style="padding:28px 32px 20px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#7c3aed;margin-bottom:6px;">
+        ${orgName} — HR Notice
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
+        Absence Recorded by HR
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px;">${dateStr}</div>
+    </div>
+
+    <div style="padding:0 32px 24px;">
+      <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+        Hi <strong>${submission.staff_name}</strong>,
+      </p>
+      <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+        Your absence on <strong>${dateStr}</strong> was logged by HR because a submission was not received from you.
+        This record has been shared with your supervisor and the school team.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:10px;">Absence Details</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;width:110px;">Status</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${statusLabel}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Date</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${dateStr}</td>
+          </tr>
+          ${submission.hr_note ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">HR Note</td>
+            <td style="font-size:13px;color:#0f172a;padding:4px 0;">${submission.hr_note}</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:14px 16px;font-size:14px;color:#92400e;line-height:1.6;">
+        <strong>Reminder:</strong> In the future, please submit your own absence using the OutOfShift form before or when your absence begins. 
+        This ensures your supervisor is notified promptly and coverage can be arranged.
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        This notice was sent by <strong style="color:#64748b;">${orgName}</strong> HR. Please do not reply to this email.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`
+
+  const text = [
+    `HR Notice — ${orgName}`,
+    ``,
+    `Hi ${submission.staff_name},`,
+    ``,
+    `Your absence on ${dateStr} was logged by HR because a submission was not received from you.`,
+    `Status: ${statusLabel}`,
+    submission.hr_note ? `HR Note: ${submission.hr_note}` : '',
+    ``,
+    `Reminder: Please submit your own absence using the OutOfShift form next time.`,
+  ].filter(Boolean).join('\n')
+
+  return { subject, html, text }
+}
+
 function formatCentralTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return new Intl.DateTimeFormat('en-US', {
@@ -313,6 +401,7 @@ export function buildInstantEmail(
           ${statusPhrase}
         </div>
         ${timeNote ? `<div style="margin-top:8px;font-size:14px;color:#475569;font-weight:500;">${timeNote}</div>` : ''}
+        ${submission.hr_excused ? `<div style="margin-top:10px;display:inline-block;background:#ede9fe;color:#5b21b6;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.04em;">🔖 HR EXCUSED</div>` : ''}
       </div>
     </div>
 
@@ -349,6 +438,7 @@ export function buildSupervisorEmail(
 ): { subject: string; html: string; text: string } {
   const statusLabel = STATUS_LABELS[submission.status]
   const needsCoverage = submission.status === 'absent' || submission.status === 'personal_day'
+  const isHrExcused = submission.hr_excused === true
 
   let timeDetail = ''
   if (submission.status === 'late' && submission.expected_arrival) {
@@ -357,7 +447,9 @@ export function buildSupervisorEmail(
     timeDetail = submission.leave_time
   }
 
-  const subject = needsCoverage
+  const subject = isHrExcused
+    ? `HR Excused — ${submission.staff_name} · ${statusLabel}`
+    : needsCoverage
     ? `Action Needed — Coverage Required for ${submission.staff_name}`
     : `Staff Notice — ${submission.staff_name} · ${statusLabel}`
 
@@ -377,7 +469,13 @@ export function buildSupervisorEmail(
     </div>
 
     <div style="padding:28px 32px;">
-      ${needsCoverage ? `
+      ${isHrExcused ? `
+        <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:16px;margin-bottom:20px;">
+          <p style="margin:0;color:#5b21b6;font-weight:600;font-size:14px;">🔖 HR Excused — Logged by HR</p>
+          <p style="margin:8px 0 0;color:#6d28d9;font-size:14px;">This absence was submitted by HR on behalf of the employee who did not call in.</p>
+          ${submission.hr_note ? `<p style="margin:8px 0 0;color:#4c1d95;font-size:13px;font-style:italic;">Note: ${submission.hr_note}</p>` : ''}
+        </div>
+      ` : needsCoverage ? `
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:20px;">
           <p style="margin:0;color:#991b1b;font-weight:600;font-size:14px;">⚠ Coverage may be needed for today.</p>
           <p style="margin:8px 0 0;color:#b91c1c;font-size:14px;">Please review your team's schedule and arrange coverage as needed.</p>

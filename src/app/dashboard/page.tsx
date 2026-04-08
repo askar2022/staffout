@@ -61,6 +61,11 @@ export default async function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-slate-900">{s.staff_name}</p>
                     <p className="text-xs text-slate-400 mt-0.5">{s.campus && `${s.campus} · `}{format(new Date(s.submitted_at), 'h:mm a')}</p>
+                    {s.hr_excused && (
+                      <span className="inline-flex items-center gap-1 mt-0.5 text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                        🔖 HR Excused
+                      </span>
+                    )}
                   </div>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLORS[s.status]}`}>
                     {STATUS_LABELS[s.status]}
