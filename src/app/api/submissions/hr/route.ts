@@ -78,8 +78,9 @@ export async function POST(request: NextRequest) {
       .eq('status', status)
       .single()
 
-    if (ptoSetting?.hours_per_day > 0) {
-      ptoHoursDeducted = ptoSetting.hours_per_day
+    const hoursPerDay = ptoSetting?.hours_per_day
+    if (hoursPerDay != null && hoursPerDay > 0) {
+      ptoHoursDeducted = hoursPerDay
     }
 
     // Insert submission
