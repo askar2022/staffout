@@ -168,6 +168,7 @@ function SubmitForm() {
 
   const isAfter8AM = new Date().getHours() >= 8
   const heroBackground = orgSlug ? ORG_HERO_BACKGROUNDS[orgSlug] : null
+  const useFullscreenHero = step === 'email' && !!heroBackground
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
@@ -374,6 +375,84 @@ function SubmitForm() {
           >
             Submit another
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (useFullscreenHero) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-slate-950">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroBackground}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: 'center center' }}
+        />
+        <div className="absolute inset-0 bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/25 via-transparent to-slate-950/30" />
+
+        <div
+          className="relative min-h-screen px-4"
+          style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <div className="max-w-lg mx-auto min-h-screen flex flex-col items-center justify-center py-8">
+            <div className="flex flex-col items-center mb-6 text-center">
+              <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
+              <span className="text-white font-extrabold text-2xl tracking-wide mt-2 px-4 text-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                {orgSlug && ORG_FULL_NAMES[orgSlug]
+                  ? ORG_FULL_NAMES[orgSlug]
+                  : 'OutOfShift'}
+              </span>
+              <h1 className="mt-4 text-2xl font-bold text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                Report your absence
+              </h1>
+            </div>
+
+            <form onSubmit={handleSendCode} className="w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
+              <div className="p-6">
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
+                  <Mail className="w-6 h-6 text-indigo-600" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-900 mb-1">Enter your work email</h2>
+                <p className="text-slate-500 text-sm mb-5">
+                  We will send a 6-digit verification code to confirm your identity.
+                </p>
+
+                {sendError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
+                    {sendError}
+                  </div>
+                )}
+
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="yourname@school.org"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 bg-white"
+                />
+
+                <button
+                  type="submit"
+                  disabled={sendingCode || !email}
+                  className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {sendingCode ? 'Sending code...' : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
+                </button>
+              </div>
+              <div className="px-6 pb-5">
+                <p className="text-xs text-slate-400 text-center">
+                  Admin?{' '}
+                  <Link href="/login" className="text-indigo-500 hover:underline">Sign in to dashboard</Link>
+                </p>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     )
