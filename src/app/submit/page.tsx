@@ -383,22 +383,31 @@ function SubmitForm() {
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
       <div
-        className="relative px-4 pb-20 text-center overflow-hidden"
+        className={`relative px-4 text-center overflow-hidden ${heroBackground ? 'pb-12' : 'pb-14'}`}
         style={
           heroBackground
-            ? {
-                paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
-                backgroundImage: `linear-gradient(rgba(49, 46, 129, 0.72), rgba(79, 70, 229, 0.82)), url("${heroBackground}")`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }
+            ? { paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }
             : {
                 paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
                 background: '#4f46e5',
               }
         }
       >
-        <div className="max-w-lg mx-auto">
+        {heroBackground && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={heroBackground}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-indigo-900/45" />
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-indigo-700/30 to-indigo-600/55" />
+          </>
+        )}
+
+        <div className="relative max-w-lg mx-auto">
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
             <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
@@ -413,7 +422,7 @@ function SubmitForm() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-10">
+      <div className="max-w-lg mx-auto px-4 mt-6">
 
         {/* ── Step 1: Email ── */}
         {step === 'email' && (
