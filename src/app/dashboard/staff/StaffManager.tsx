@@ -60,21 +60,6 @@ export default function StaffManager({ initialStaff }: Props) {
     }
   }
 
-  function downloadTemplate() {
-    const csv = [
-      'Full Name,Email,Position,Campus,Supervisor Name,Supervisor Email',
-      'Ms. Johnson,mjohnson@school.org,Math Teacher,Main Campus,Mr. Ahmed,mahmed@school.org',
-      'Mr. Hassan,mhassan@school.org,Science Teacher,Main Campus,Mr. Ahmed,mahmed@school.org',
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'staff-import-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   function exportCurrentStaffCSV() {
     const rows = [
       [
@@ -275,13 +260,6 @@ export default function StaffManager({ initialStaff }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* CSV import controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={downloadTemplate}
-            className="flex items-center gap-2 text-sm font-medium text-slate-600 border border-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download Import Template
-          </button>
           <button
             onClick={exportCurrentStaffCSV}
             className="flex items-center gap-2 text-sm font-medium text-indigo-700 border border-indigo-200 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
