@@ -383,7 +383,7 @@ function SubmitForm() {
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
       <div
-        className={`relative px-4 text-center overflow-hidden ${heroBackground ? 'pb-12' : 'pb-14'}`}
+        className={`relative px-4 text-center overflow-hidden ${heroBackground ? 'pb-16 min-h-[280px]' : 'pb-14'}`}
         style={
           heroBackground
             ? { paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }
@@ -400,10 +400,11 @@ function SubmitForm() {
               src={heroBackground}
               alt=""
               aria-hidden="true"
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: 'center 38%' }}
             />
-            <div className="absolute inset-0 bg-indigo-900/45" />
-            <div className="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-indigo-700/30 to-indigo-600/55" />
+            <div className="absolute inset-0 bg-slate-950/10" />
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-950/10 via-transparent to-indigo-950/35" />
           </>
         )}
 
@@ -411,18 +412,18 @@ function SubmitForm() {
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
             <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
-            <span className="text-white font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
+            <span className="text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)] font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
               {orgSlug && ORG_FULL_NAMES[orgSlug]
                 ? ORG_FULL_NAMES[orgSlug]
                 : 'OutOfShift'}
             </span>
           </div>
           {/* Step context */}
-          <h1 className="text-xl font-bold text-white mb-1">Report your absence</h1>
+          <h1 className="text-xl font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)] mb-1">Report your absence</h1>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 mt-6">
+      <div className="max-w-lg mx-auto px-4 -mt-8">
 
         {/* ── Step 1: Email ── */}
         {step === 'email' && (
