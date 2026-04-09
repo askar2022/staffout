@@ -168,7 +168,7 @@ function SubmitForm() {
 
   const isAfter8AM = new Date().getHours() >= 8
   const heroBackground = orgSlug ? ORG_HERO_BACKGROUNDS[orgSlug] : null
-  const useFullscreenHero = (step === 'email' || step === 'code') && !!heroBackground
+  const useFullscreenHero = (step === 'email' || step === 'code' || step === 'form') && !!heroBackground
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
@@ -380,7 +380,7 @@ function SubmitForm() {
     )
   }
 
-  if (useFullscreenHero) {
+  if (useFullscreenHero && (step === 'email' || step === 'code')) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-slate-950">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -512,6 +512,289 @@ function SubmitForm() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (useFullscreenHero && step === 'form') {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-slate-950 pb-10 pb-safe">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroBackground}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: 'center center' }}
+        />
+        <div className="absolute inset-0 bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/25 via-transparent to-slate-950/30" />
+
+        <div
+          className="relative px-4"
+          style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <div className="max-w-lg mx-auto">
+            <div className="flex flex-col items-center mb-6 text-center">
+              <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
+              <span className="text-white font-extrabold text-2xl tracking-wide mt-2 px-4 text-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                {orgSlug && ORG_FULL_NAMES[orgSlug]
+                  ? ORG_FULL_NAMES[orgSlug]
+                  : 'OutOfShift'}
+              </span>
+              <h1 className="mt-4 text-2xl font-bold text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                Report your absence
+              </h1>
+            </div>
+
+            <form onSubmit={handleSubmit} className="bg-white/96 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
+              {/* PTO balance banner — only show if balance is set */}
+              {ptoInfo?.balance !== null && ptoInfo !== null && (
+                <div className={`border-b px-5 py-3 flex items-center gap-2 ${
+                  (ptoInfo.remaining ?? 0) <= 0
+                    ? 'bg-red-50 border-red-100'
+                    : (ptoInfo.remaining ?? 0) <= 16
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-indigo-50 border-indigo-100'
+                }`}>
+                  <Clock className={`w-4 h-4 shrink-0 ${
+                    (ptoInfo.remaining ?? 0) <= 0 ? 'text-red-500' : (ptoInfo.remaining ?? 0) <= 16 ? 'text-amber-500' : 'text-indigo-500'
+                  }`} />
+                  <p className="text-sm">
+                    <span className="font-semibold">
+                      {ptoInfo.remaining !== null ? `${formatPtoHours(ptoInfo.remaining)} PTO remaining` : '—'}
+                    </span>
+                    <span className="text-slate-500 ml-1">
+                      ({formatPtoHours(ptoInfo.used)} used of {formatPtoHours(ptoInfo.balance)})
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {/* Verified identity banner */}
+              <div className="bg-green-50 border-b border-green-100 px-5 py-3 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+                <div>
+                  <span className="text-sm font-semibold text-green-800">
+                    {verifiedStaff?.full_name ?? email}
+                  </span>
+                  {verifiedStaff?.position && (
+                    <span className="text-xs text-green-600 ml-2">· {verifiedStaff.position}</span>
+                  )}
+                </div>
+              </div>
+
+              {submitError && (
+                <div className="bg-red-50 border-b border-red-200 text-red-700 text-sm px-5 py-3">
+                  {submitError}
+                </div>
+              )}
+
+              <div className="p-6 space-y-5">
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Status today</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {statusOptions.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                          status === opt.value
+                            ? opt.color + ' border-current'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="status"
+                          value={opt.value}
+                          required
+                          checked={status === opt.value}
+                          onChange={() => setStatus(opt.value)}
+                          className="hidden"
+                        />
+                        <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                          status === opt.value ? 'border-current bg-current' : 'border-slate-300'
+                        }`}>
+                          {status === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold">{opt.label}</div>
+                          <div className="text-xs opacity-80">{opt.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time fields */}
+                {status === 'late' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Expected arrival time</label>
+                    <input
+                      type="time"
+                      value={expectedArrival}
+                      onChange={(e) => setExpectedArrival(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">PTO will be deducted from 8:00 AM to the time you select.</p>
+                  </div>
+                )}
+
+                {status === 'leaving_early' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Time leaving
+                    </label>
+                    <input
+                      type="time"
+                      value={leaveTime}
+                      onChange={(e) => setLeaveTime(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">PTO will be deducted from the time you select until 4:00 PM.</p>
+                  </div>
+                )}
+
+                {/* Reason */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Reason <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <select
+                    value={reasonCategory}
+                    onChange={(e) => setReasonCategory(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  >
+                    <option value="">Select a reason...</option>
+                    {Object.entries(REASON_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-400">Only visible to your supervisor and admin.</p>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Notes <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Any additional details for your supervisor..."
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">Private — shared only with your supervisor and admin.</p>
+                </div>
+
+                {/* Multi-day toggle */}
+                {status === 'absent' && (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isMultiDay}
+                        onChange={(e) => setIsMultiDay(e.target.checked)}
+                        className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                          <CalendarRange className="w-4 h-4 text-indigo-500" />
+                          Multi-day absence
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Use this if you will be out for more than one weekday.
+                        </div>
+                      </div>
+                    </label>
+                    {isMultiDay && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Last day out</label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Lesson plan upload for teachers */}
+                {verifiedStaff?.position?.toLowerCase().includes('teacher') && status === 'absent' && (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">Lesson plan</p>
+                        <p className="text-xs text-slate-500">Attach a lesson plan for your supervisor if needed.</p>
+                      </div>
+                      {lessonPlanUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLessonPlanFile(null)
+                            setLessonPlanUrl(null)
+                            setUploadError('')
+                            if (lessonPlanRef.current) lessonPlanRef.current.value = ''
+                          }}
+                          className="text-slate-400 hover:text-slate-600"
+                          aria-label="Remove lesson plan"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={lessonPlanRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0] ?? null
+                        setLessonPlanFile(file)
+                        setLessonPlanUrl(null)
+                        setUploadError('')
+                        if (file) await handleLessonPlanUpload(file)
+                      }}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => lessonPlanRef.current?.click()}
+                      className="w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-4 text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Paperclip className="w-4 h-4" />
+                        {uploadingPlan
+                          ? 'Uploading lesson plan...'
+                          : lessonPlanFile
+                          ? `${lessonPlanFile.name}${lessonPlanUrl ? ' uploaded' : ''}`
+                          : 'Upload lesson plan'}
+                      </div>
+                    </button>
+                    {uploadError && <p className="mt-2 text-xs text-red-600">{uploadError}</p>}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting || uploadingPlan}
+                  className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {submitting
+                    ? 'Submitting...'
+                    : isAfter8AM
+                    ? 'Submit — all staff email goes out now'
+                    : 'Submit — included in 8:00 AM staff email'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
