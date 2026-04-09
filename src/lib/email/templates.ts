@@ -9,6 +9,9 @@ export function buildConfirmationEmail(
 ): { subject: string; html: string; text: string } {
   const statusLabel = STATUS_LABELS[submission.status] ?? submission.status
   const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+  const throughStr = submission.end_date
+    ? format(new Date(submission.end_date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+    : null
   const hasSupervisor = !!submission.supervisor_name
 
   const subject = `Your absence has been recorded — ${dateStr}`
@@ -48,6 +51,22 @@ export function buildConfirmationEmail(
             <td style="font-size:13px;color:#64748b;padding:4px 0;">Date</td>
             <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${dateStr}</td>
           </tr>
+          ${throughStr ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Through</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${throughStr}</td>
+          </tr>` : ''}
+          ${submission.reason_category ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Reason</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td>
+          </tr>` : ''}
+          ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Deducted</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_hours_deducted} hours</td>
+          </tr>` : ''}
+          ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_remaining_after} hours</td>
+          </tr>` : ''}
           ${submission.notes ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">Notes</td>
             <td style="font-size:13px;color:#0f172a;padding:4px 0;">${submission.notes}</td>
@@ -80,6 +99,14 @@ export function buildConfirmationEmail(
     `Hi ${submission.staff_name},`,
     `Your absence has been recorded for ${dateStr}.`,
     `Status: ${statusLabel}`,
+    throughStr ? `Through: ${throughStr}` : '',
+    submission.reason_category ? `Reason: ${submission.reason_category}` : '',
+    submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
+      ? `PTO Deducted: ${submission.pto_hours_deducted} hours`
+      : '',
+    submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
+      ? `PTO Remaining: ${submission.pto_remaining_after} hours`
+      : '',
     submission.notes ? `Notes: ${submission.notes}` : '',
     ``,
     hasSupervisor
