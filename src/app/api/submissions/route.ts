@@ -227,7 +227,14 @@ export async function POST(request: NextRequest) {
       await db.from('submissions').update({ instant_sent: true }).eq('id', submission.id)
     }
 
-    return apiOk({ success: true, id: submission.id }, 201)
+    return apiOk(
+      {
+        success: true,
+        id: submission.id,
+        pto_hours_deducted: ptoHoursDeducted,
+      },
+      201
+    )
   } catch {
     return apiError('Server error', 500)
   }

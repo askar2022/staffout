@@ -159,6 +159,7 @@ function SubmitForm() {
 
   // PTO balance
   const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null } | null>(null)
+  const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
 
   const isAfter8AM = new Date().getHours() >= 8
 
@@ -271,6 +272,18 @@ function SubmitForm() {
     if (!res.ok) {
       setSubmitError(data.error || 'Something went wrong. Please try again.')
     } else {
+      setSubmittedPtoDeducted(data.pto_hours_deducted ?? null)
+      if (verifiedStaff?.id && org?.id) {
+        try {
+          const ptoRes = await fetch(`/api/pto?staff_id=${verifiedStaff.id}&org_id=${org.id}`)
+          const ptoData = await ptoRes.json()
+          if (ptoRes.ok) {
+            setPtoInfo(ptoData)
+          }
+        } catch {
+          // If refresh fails, keep the previous snapshot and still show success
+        }
+      }
       setStep('done')
     }
   }
@@ -302,6 +315,11 @@ function SubmitForm() {
               </span>
             </div>
           )}
+          {submittedPtoDeducted !== null && submittedPtoDeducted > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              PTO deducted for this submission: {submittedPtoDeducted}h
+            </p>
+          )}
           <button
             onClick={() => {
               setStep('email')
@@ -319,6 +337,7 @@ function SubmitForm() {
               setLessonPlanFile(null)
               setLessonPlanUrl(null)
               setPtoInfo(null)
+              setSubmittedPtoDeducted(null)
             }}
             className="mt-5 text-sm text-indigo-600 font-medium hover:underline"
           >
