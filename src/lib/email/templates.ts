@@ -447,6 +447,18 @@ export function buildSupervisorEmail(
     timeDetail = submission.leave_time
   }
 
+  const throughLabel = submission.end_date
+    ? format(new Date(submission.end_date + 'T12:00:00'), 'MMM d')
+    : null
+  const headerLabel = isHrExcused
+    ? 'HR Excused — Supervisor Notice'
+    : needsCoverage
+    ? 'Coverage Needed Today'
+    : 'Supervisor Notice'
+  const headerDetail = throughLabel
+    ? `${statusLabel} through ${throughLabel}`
+    : `${statusLabel}${timeDetail ? ` · ${timeDetail}` : ''}`
+
   const subject = isHrExcused
     ? `HR Excused — ${submission.staff_name} · ${statusLabel}`
     : needsCoverage
@@ -462,10 +474,13 @@ export function buildSupervisorEmail(
     
     <div style="background:${needsCoverage ? '#dc2626' : '#d97706'};padding:36px 32px 28px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:4px;">
-        ${needsCoverage ? 'Action Required — Supervisor Notice' : 'Supervisor Notice'}
+        ${headerLabel}
       </div>
       <div style="font-size:22px;font-weight:700;color:#ffffff;">${submission.staff_name}</div>
-      <div style="font-size:15px;color:rgba(255,255,255,0.85);margin-top:4px;">${statusLabel}${timeDetail ? ` · ${timeDetail}` : ''}</div>
+      <div style="font-size:15px;color:rgba(255,255,255,0.92);margin-top:4px;">${headerDetail}</div>
+      ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
+        ? `<div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">PTO remaining: ${submission.pto_remaining_after}h</div>`
+        : ''}
     </div>
 
     <div style="padding:28px 32px;">
