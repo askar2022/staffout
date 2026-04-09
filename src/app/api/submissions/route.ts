@@ -68,12 +68,14 @@ export async function POST(request: NextRequest) {
     let staffEmail: string | null = null
     let position: string | null = null
     let campus: string | null = null
+    let ptoBalance: number | null = null
+    let ptoUsedBefore = 0
 
     const staffId = sanitize(body.staff_id, 36)
     if (staffId) {
       const { data: member } = await db
         .from('staff_members')
-        .select('email, position, campus, supervisor_email, supervisor_name')
+        .select('email, position, campus, supervisor_email, supervisor_name, pto_balance')
         .eq('id', staffId)
         .eq('organization_id', orgId)
         .single()
@@ -84,6 +86,19 @@ export async function POST(request: NextRequest) {
         campus = member.campus ?? null
         supervisorEmail = member.supervisor_email ?? null
         supervisorName = member.supervisor_name ?? null
+        ptoBalance = member.pto_balance ?? null
+
+        const { data: priorPtoRows } = await db
+          .from('submissions')
+          .select('pto_hours_deducted')
+          .eq('staff_id', staffId)
+          .eq('organization_id', orgId)
+          .not('pto_hours_deducted', 'is', null)
+
+        ptoUsedBefore = (priorPtoRows ?? []).reduce(
+          (sum, row) => sum + (row.pto_hours_deducted ?? 0),
+          0
+        )
       }
     }
 
@@ -160,7 +175,13 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to save submission', 500)
     }
 
-    const sub = submission as Submission
+    const sub = {
+      ...(submission as Submission),
+      pto_remaining_after:
+        ptoBalance !== null
+          ? ptoBalance - ptoUsedBefore - (ptoHoursDeducted ?? 0)
+          : null,
+    } satisfies Submission
 
     // Always send confirmation back to the staff member who submitted
     if (staffEmail) {

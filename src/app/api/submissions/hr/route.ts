@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Look up the staff member
     const { data: member } = await db
       .from('staff_members')
-      .select('full_name, email, position, campus, supervisor_email, supervisor_name')
+      .select('full_name, email, position, campus, supervisor_email, supervisor_name, pto_balance')
       .eq('id', staffId)
       .eq('organization_id', orgId)
       .single()
@@ -68,6 +68,20 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!org) return apiError('Organization not found', 404)
+
+    const ptoBalance = member.pto_balance ?? null
+    let ptoUsedBefore = 0
+    const { data: priorPtoRows } = await db
+      .from('submissions')
+      .select('pto_hours_deducted')
+      .eq('staff_id', staffId)
+      .eq('organization_id', orgId)
+      .not('pto_hours_deducted', 'is', null)
+
+    ptoUsedBefore = (priorPtoRows ?? []).reduce(
+      (sum, row) => sum + (row.pto_hours_deducted ?? 0),
+      0
+    )
 
     // Auto-calculate PTO deduction
     let ptoHoursDeducted: number | null = null
@@ -113,7 +127,13 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to save submission', 500)
     }
 
-    const sub = submission as Submission
+    const sub = {
+      ...(submission as Submission),
+      pto_remaining_after:
+        ptoBalance !== null
+          ? ptoBalance - ptoUsedBefore - (ptoHoursDeducted ?? 0)
+          : null,
+    } satisfies Submission
 
     // 1. Accountability email to the staff member
     if (member.email) {

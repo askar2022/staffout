@@ -489,6 +489,7 @@ export function buildSupervisorEmail(
         ${submission.campus ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Campus</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.campus}</td></tr>` : ''}
         ${timeDetail ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Time</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${timeDetail}</td></tr>` : ''}
         ${submission.reason_category ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Reason</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td></tr>` : ''}
+        ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">PTO Remaining</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${submission.pto_remaining_after} hours</td></tr>` : ''}
         ${submission.notes ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:8px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
         ${submission.end_date ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Through</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.end_date}</td></tr>` : ''}
       </table>
@@ -520,6 +521,9 @@ export function buildSupervisorEmail(
     submission.campus ? `Campus: ${submission.campus}` : '',
     timeDetail ? `Time: ${timeDetail}` : '',
     submission.reason_category ? `Reason: ${submission.reason_category}` : '',
+    submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
+      ? `PTO Remaining: ${submission.pto_remaining_after} hours`
+      : '',
     submission.notes ? `Notes: "${submission.notes}"` : '',
   ]
     .filter(Boolean)
