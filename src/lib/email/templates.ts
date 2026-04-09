@@ -215,6 +215,18 @@ function formatCentralTime(date: Date | string): string {
   }).format(d)
 }
 
+function formatShortDate(date: string): string {
+  return format(new Date(date + 'T12:00:00'), 'MMM d')
+}
+
+function allStaffStatusPhrase(s: Submission, statusLabel: string): string {
+  const base = STATUS_PHRASE[s.status] ?? `is ${statusLabel}`
+  if ((s.status === 'absent' || s.status === 'personal_day') && s.end_date && s.end_date > s.date) {
+    return `${base.replace(' today', '')} through ${formatShortDate(s.end_date)}`
+  }
+  return base
+}
+
 function statusLine(s: Submission): string {
   let detail = ''
   if (s.status === 'late' && s.expected_arrival) {
@@ -223,6 +235,8 @@ function statusLine(s: Submission): string {
     detail = ` — Leaving at ${s.leave_time}`
   } else if (s.status === 'appointment' && s.leave_time) {
     detail = ` — Off campus at ${s.leave_time}`
+  } else if ((s.status === 'absent' || s.status === 'personal_day') && s.end_date && s.end_date > s.date) {
+    detail = ` — Through ${formatShortDate(s.end_date)}`
   }
   const campus = s.campus ? ` (${s.campus})` : ''
   const position = s.position ? ` · ${s.position}` : ''
@@ -380,7 +394,7 @@ export function buildInstantEmail(
 ): { subject: string; html: string; text: string } {
   const timeStr = formatCentralTime(submission.submitted_at)
   const statusLabel = STATUS_LABELS[submission.status]
-  const statusPhrase = STATUS_PHRASE[submission.status] ?? `is ${statusLabel}`
+  const statusPhrase = allStaffStatusPhrase(submission, statusLabel)
 
   const subject = `Staff Update — ${orgName}`
 

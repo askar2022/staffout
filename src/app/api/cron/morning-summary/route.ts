@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const results = []
 
     for (const org of orgs) {
-      const { data: rawSubs } = await db
+      const { data: rawTodaySubs } = await db
         .from('submissions')
         .select('*')
         .eq('organization_id', org.id)
@@ -29,7 +29,22 @@ export async function GET(request: Request) {
         .eq('summary_included', false)
         .eq('instant_sent', false)
 
-      const submissions = (rawSubs ?? []) as Submission[]
+      const { data: rawOngoingSubs } = await db
+        .from('submissions')
+        .select('*')
+        .eq('organization_id', org.id)
+        .lt('date', today)
+        .gte('end_date', today)
+
+      const todaySubmissions = (rawTodaySubs ?? []) as Submission[]
+      const ongoingSubmissions = (rawOngoingSubs ?? []) as Submission[]
+      const submissions = [...todaySubmissions]
+
+      for (const sub of ongoingSubmissions) {
+        if (!submissions.some((s) => s.id === sub.id)) {
+          submissions.push(sub)
+        }
+      }
 
       const { data: rawRecipients } = await db
         .from('notification_recipients')
@@ -63,8 +78,8 @@ export async function GET(request: Request) {
         error_message: emailResult.success ? null : (emailResult as { error?: string }).error ?? null,
       })
 
-      // Supervisor notices for absent staff
-      const absentStaff = submissions.filter(
+      // Supervisor notices only for today's new absent staff
+      const absentStaff = todaySubmissions.filter(
         (s) => (s.status === 'absent' || s.status === 'personal_day') && s.supervisor_email
       )
 
@@ -81,17 +96,18 @@ export async function GET(request: Request) {
         })
       }
 
-      if (submissions.length > 0) {
+      if (todaySubmissions.length > 0) {
         await db
           .from('submissions')
           .update({ summary_included: true })
-          .in('id', submissions.map((s) => s.id))
+          .in('id', todaySubmissions.map((s) => s.id))
       }
 
       results.push({
         org: org.name,
         submissions: submissions.length,
         emailsSent: summaryEmails.length,
+        carriedForwardMultiDay: ongoingSubmissions.length,
         supervisorAlerts: absentStaff.length,
       })
     }
