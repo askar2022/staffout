@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sanitize, isValidEmail, apiError, apiOk } from '@/lib/auth'
+import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const email = sanitize(body.email, 200).toLowerCase()
+    const email = normalizeWorkEmail(sanitize(body.email, 200))
     const code = sanitize(body.code, 6)
 
     if (!email || !isValidEmail(email)) return apiError('Valid email is required')
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     let staffQuery = db
       .from('staff_members')
       .select('id, full_name, position, campus, supervisor_email, supervisor_name, organization_id')
-      .eq('email', email)
+      .ilike('email', email)
       .eq('is_active', true)
 
     if (orgId) {

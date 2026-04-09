@@ -64,6 +64,11 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+/** Normalize work emails for storage and duplicate checks (case-insensitive) */
+export function normalizeWorkEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
 /** Standard API error response */
 export function apiError(message: string, status = 400): Response {
   return Response.json({ error: message }, { status })

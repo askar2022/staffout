@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
+import { requireAuth, sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -38,11 +38,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const fullName = sanitize(body.full_name, 100)
     if (!fullName) return apiError('Full name is required')
 
-    const email = sanitize(body.email, 200)
-    if (email && !isValidEmail(email)) return apiError('Invalid email address')
+    const emailRaw = sanitize(body.email, 200)
+    if (emailRaw && !isValidEmail(emailRaw)) return apiError('Invalid email address')
+    const email = emailRaw ? normalizeWorkEmail(emailRaw) : ''
 
     const supervisorEmail = sanitize(body.supervisor_email, 200)
     if (supervisorEmail && !isValidEmail(supervisorEmail)) return apiError('Invalid supervisor email')
+
+    if (email) {
+      const { data: dupe } = await db
+        .from('staff_members')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('is_active', true)
+        .ilike('email', email)
+        .neq('id', id)
+        .limit(1)
+        .maybeSingle()
+      if (dupe) {
+        return apiError(
+          'Another staff member already uses this email. Use a different email or archive the duplicate.',
+          409
+        )
+      }
+    }
 
     const ptoBalance = body.pto_balance !== undefined
       ? (body.pto_balance === '' || body.pto_balance === null ? null : Number(body.pto_balance))
@@ -56,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         position: sanitize(body.position, 100) || null,
         campus: sanitize(body.campus, 100) || null,
         supervisor_name: sanitize(body.supervisor_name, 100) || null,
-        supervisor_email: supervisorEmail || null,
+        supervisor_email: supervisorEmail ? normalizeWorkEmail(supervisorEmail) : null,
         employee_id: sanitize(body.employee_id, 50) || null,
         ...(ptoBalance !== undefined ? { pto_balance: ptoBalance } : {}),
       })

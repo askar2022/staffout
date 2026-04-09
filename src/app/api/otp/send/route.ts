@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sanitize, isValidEmail, apiError, apiOk } from '@/lib/auth'
+import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 
 function generateCode(): string {
@@ -10,7 +10,7 @@ function generateCode(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const email = sanitize(body.email, 200).toLowerCase()
+    const email = normalizeWorkEmail(sanitize(body.email, 200))
 
     if (!email || !isValidEmail(email)) {
       return apiError('Valid work email is required')
@@ -42,17 +42,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the staff member — scoped to the org if we have one
+    // Use ilike (case-insensitive) + limit(1): .single() fails when duplicate rows exist for the same email;
+    // mixed-case storage (A@x.com vs a@x.com) also broke .eq() lookups.
     let staffQuery = db
       .from('staff_members')
       .select('id, full_name, organization_id, position, campus')
-      .eq('email', email)
+      .ilike('email', email)
       .eq('is_active', true)
 
     if (orgId) {
       staffQuery = staffQuery.eq('organization_id', orgId)
     }
 
-    const { data: staffMember } = await staffQuery.single()
+    const { data: staffRows } = await staffQuery.limit(1)
+    const staffMember = staffRows?.[0] ?? null
 
     // For real schools (non-demo), block if email is not in the staff directory
     if (orgId && orgSlug !== 'demo' && !staffMember) {
