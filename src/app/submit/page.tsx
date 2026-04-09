@@ -349,7 +349,8 @@ function SubmitForm() {
             {step === 'email' && 'Enter your work email to get started'}
             {step === 'code' && 'Enter the code sent to your email'}
             {step === 'pick' && 'Select your name to continue'}
-            {step === 'form' && (isAfter8AM ? 'After 8:00 AM — instant alert will be sent' : 'Before 8:00 AM — included in morning summary')}
+            {step === 'form' &&
+              'All staff: reports made after school and before 8:00 AM send at 8:00 AM. During school hours, they send instantly. Supervisors: immediate.'}
           </p>
         </div>
       </div>
@@ -751,8 +752,8 @@ function SubmitForm() {
                 {submitting
                   ? 'Submitting...'
                   : isAfter8AM
-                  ? 'Submit — instant alert will be sent'
-                  : 'Submit — included in 8:00 AM summary'}
+                  ? 'Submit — all staff email goes out now'
+                  : 'Submit — included in 8:00 AM staff email'}
               </button>
             </div>
           </form>
