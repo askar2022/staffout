@@ -185,6 +185,24 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
 
         </div>
 
+        <details className="mt-5 text-left max-w-md mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
+          <summary className="cursor-pointer font-semibold text-slate-700 list-none flex items-center justify-between">
+            <span>Trouble signing in (Chrome freezes or &quot;rate limit&quot;)?</span>
+            <span className="text-slate-400" aria-hidden>▼</span>
+          </summary>
+          <ol className="mt-3 space-y-2 list-decimal pl-4 leading-relaxed">
+            <li>
+              <strong className="text-slate-700">Use Microsoft Edge</strong> for this site — it often works when Chrome does not, and can stay signed in.
+            </li>
+            <li>
+              In Chrome: close <strong>every</strong> OutOfShift tab, then open Settings → Privacy → delete browsing data → only <strong>Cookies</strong> for this site (or search for <strong>outofshift</strong> under Cookies and remove them).
+            </li>
+            <li>
+              Wait <strong>10–15 minutes</strong> if you see a rate-limit message, then try again once.
+            </li>
+          </ol>
+        </details>
+
         <p className="text-center text-xs text-slate-400 mt-6">
           Staff submitting an absence?{' '}
           <Link href="/submit" className="text-indigo-500 hover:underline">
