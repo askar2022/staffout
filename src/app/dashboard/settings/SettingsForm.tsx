@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Check, Mail, Building2, Clock, ShieldCheck } from 'lucide-react'
 import type { NotificationRecipient, Organization, PtoDeductionSetting } from '@/lib/types'
 
+const PTO_RULE_LABELS: Record<string, string> = {
+  absent: 'Absent (full day)',
+  late: 'Late Arrival',
+  leaving_early: 'Leaving Early',
+}
+
 interface Props {
   org: Organization
   initialRecipients: NotificationRecipient[]
@@ -201,34 +207,27 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
           <p className="text-sm text-slate-400">Loading...</p>
         ) : (
           <div className="space-y-3">
-            {ptoSettings.map((s) => {
-              const labels: Record<string, string> = {
-                absent: 'Absent (full day)',
-                personal_day: 'Personal Day',
-                late: 'Late Arrival',
-                leaving_early: 'Leaving Early',
-                appointment: 'Off-Campus Appointment',
-              }
-              return (
-                <div key={s.status} className="flex items-center gap-4">
-                  <label className="text-sm text-slate-700 w-52 shrink-0">{labels[s.status] ?? s.status}</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={s.hours_per_day}
-                      onChange={(e) => setPtoSettings((prev) =>
-                        prev.map((p) => p.status === s.status ? { ...p, hours_per_day: Number(e.target.value) } : p)
-                      )}
-                      className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
-                    />
-                    <span className="text-sm text-slate-500">hours / day</span>
-                  </div>
+            {ptoSettings.map((s) => (
+              <div key={s.status} className="flex items-center gap-4">
+                <label className="text-sm text-slate-700 w-52 shrink-0">
+                  {PTO_RULE_LABELS[s.status] ?? s.status}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    step="0.5"
+                    value={s.hours_per_day}
+                    onChange={(e) => setPtoSettings((prev) =>
+                      prev.map((p) => p.status === s.status ? { ...p, hours_per_day: Number(e.target.value) } : p)
+                    )}
+                    className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                  />
+                  <span className="text-sm text-slate-500">hours / day</span>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         )}
 

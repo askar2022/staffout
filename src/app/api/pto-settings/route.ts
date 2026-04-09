@@ -4,10 +4,8 @@ import { requireAuth, apiError, apiOk, AuthError } from '@/lib/auth'
 
 const DEFAULT_SETTINGS = [
   { status: 'absent',        hours_per_day: 8 },
-  { status: 'personal_day',  hours_per_day: 8 },
   { status: 'late',          hours_per_day: 2 },
   { status: 'leaving_early', hours_per_day: 4 },
-  { status: 'appointment',   hours_per_day: 2 },
 ]
 
 export async function GET() {
