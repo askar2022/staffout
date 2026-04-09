@@ -1,5 +1,6 @@
 import { Submission, STATUS_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
+import { formatPtoHours } from '@/lib/pto'
 
 // ── Staff Confirmation Email ──────────────────────────────────────────────────
 
@@ -61,11 +62,11 @@ export function buildConfirmationEmail(
           </tr>` : ''}
           ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Deducted</td>
-            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_hours_deducted} hours</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours</td>
           </tr>` : ''}
           ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">${submission.pto_remaining_after < 0 ? 'PTO Overage' : 'PTO Remaining'}</td>
-            <td style="font-size:13px;font-weight:600;color:${submission.pto_remaining_after < 0 ? '#b91c1c' : '#0f172a'};padding:4px 0;">${submission.pto_remaining_after < 0 ? `${Math.abs(submission.pto_remaining_after)} hours over balance` : `${submission.pto_remaining_after} hours`}</td>
+            <td style="font-size:13px;font-weight:600;color:${submission.pto_remaining_after < 0 ? '#b91c1c' : '#0f172a'};padding:4px 0;">${submission.pto_remaining_after < 0 ? `${formatPtoHours(Math.abs(submission.pto_remaining_after), { suffix: false })} hours over balance` : `${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`}</td>
           </tr>` : ''}
           ${submission.notes ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">Notes</td>
@@ -102,12 +103,12 @@ export function buildConfirmationEmail(
     throughStr ? `Through: ${throughStr}` : '',
     submission.reason_category ? `Reason: ${submission.reason_category}` : '',
     submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
-      ? `PTO Deducted: ${submission.pto_hours_deducted} hours`
+      ? `PTO Deducted: ${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours`
       : '',
     submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
       ? submission.pto_remaining_after < 0
-        ? `PTO Overage: ${Math.abs(submission.pto_remaining_after)} hours over balance`
-        : `PTO Remaining: ${submission.pto_remaining_after} hours`
+        ? `PTO Overage: ${formatPtoHours(Math.abs(submission.pto_remaining_after), { suffix: false })} hours over balance`
+        : `PTO Remaining: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
       : '',
     submission.notes ? `Notes: ${submission.notes}` : '',
     ``,
@@ -220,7 +221,7 @@ export function buildPtoOverageEmail(
   const overageHours = remaining !== null && remaining < 0 ? Math.abs(remaining) : 0
   const ptoUsedTotal = submission.pto_used_total ?? null
 
-  const subject = `PTO Alert — ${submission.staff_name} is over balance by ${overageHours}h`
+  const subject = `PTO Alert — ${submission.staff_name} is over balance by ${formatPtoHours(overageHours)}`
 
   const html = `
 <!DOCTYPE html>
@@ -237,7 +238,7 @@ export function buildPtoOverageEmail(
       <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
         ${submission.staff_name} is over PTO balance
       </div>
-      <div style="font-size:14px;color:#64748b;margin-top:4px;">Over balance by ${overageHours} hours</div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px;">Over balance by ${formatPtoHours(overageHours, { suffix: false })} hours</div>
     </div>
 
     <div style="padding:0 32px 24px;">
@@ -266,19 +267,19 @@ export function buildPtoOverageEmail(
           </tr>` : ''}
           ${submission.pto_balance_total !== null && submission.pto_balance_total !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Bank</td>
-            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_balance_total} hours</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_balance_total, { suffix: false })} hours</td>
           </tr>` : ''}
           ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Deducted</td>
-            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_hours_deducted} hours</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours</td>
           </tr>` : ''}
           ${ptoUsedTotal !== null && ptoUsedTotal !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Used Total</td>
-            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${ptoUsedTotal} hours</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(ptoUsedTotal, { suffix: false })} hours</td>
           </tr>` : ''}
           ${remaining !== null ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
-            <td style="font-size:13px;font-weight:700;color:#b91c1c;padding:4px 0;">${remaining} hours</td>
+            <td style="font-size:13px;font-weight:700;color:#b91c1c;padding:4px 0;">${formatPtoHours(remaining, { suffix: false })} hours</td>
           </tr>` : ''}
         </table>
       </div>
@@ -296,20 +297,20 @@ export function buildPtoOverageEmail(
   const text = [
     `PTO Alert — ${orgName}`,
     ``,
-    `${submission.staff_name} is over PTO balance by ${overageHours} hours.`,
+    `${submission.staff_name} is over PTO balance by ${formatPtoHours(overageHours, { suffix: false })} hours.`,
     `Status: ${statusLabel}`,
     `Date: ${dateStr}`,
     throughStr ? `Through: ${throughStr}` : '',
     submission.pto_balance_total !== null && submission.pto_balance_total !== undefined
-      ? `PTO Bank: ${submission.pto_balance_total} hours`
+      ? `PTO Bank: ${formatPtoHours(submission.pto_balance_total, { suffix: false })} hours`
       : '',
     submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
-      ? `PTO Deducted: ${submission.pto_hours_deducted} hours`
+      ? `PTO Deducted: ${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours`
       : '',
     ptoUsedTotal !== null && ptoUsedTotal !== undefined
-      ? `PTO Used Total: ${ptoUsedTotal} hours`
+      ? `PTO Used Total: ${formatPtoHours(ptoUsedTotal, { suffix: false })} hours`
       : '',
-    remaining !== null ? `PTO Remaining: ${remaining} hours` : '',
+    remaining !== null ? `PTO Remaining: ${formatPtoHours(remaining, { suffix: false })} hours` : '',
     ``,
     `This submission was accepted, but HR follow-up may be needed.`,
   ].filter(Boolean).join('\n')
@@ -632,7 +633,7 @@ export function buildSupervisorEmail(
       <div style="font-size:22px;font-weight:700;color:#ffffff;">${submission.staff_name}</div>
       <div style="font-size:15px;color:rgba(255,255,255,0.92);margin-top:4px;">${headerDetail}</div>
       ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
-        ? `<div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">PTO remaining: ${submission.pto_remaining_after}h</div>`
+        ? `<div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">PTO remaining: ${formatPtoHours(submission.pto_remaining_after)}</div>`
         : ''}
     </div>
 
@@ -657,7 +658,7 @@ export function buildSupervisorEmail(
         ${submission.campus ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Campus</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.campus}</td></tr>` : ''}
         ${timeDetail ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Time</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${timeDetail}</td></tr>` : ''}
         ${submission.reason_category ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Reason</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td></tr>` : ''}
-        ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">PTO Remaining</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${submission.pto_remaining_after} hours</td></tr>` : ''}
+        ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">PTO Remaining</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours</td></tr>` : ''}
         ${submission.notes ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:8px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
         ${submission.end_date ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Through</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.end_date}</td></tr>` : ''}
       </table>
@@ -690,7 +691,7 @@ export function buildSupervisorEmail(
     timeDetail ? `Time: ${timeDetail}` : '',
     submission.reason_category ? `Reason: ${submission.reason_category}` : '',
     submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
-      ? `PTO Remaining: ${submission.pto_remaining_after} hours`
+      ? `PTO Remaining: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
       : '',
     submission.notes ? `Notes: "${submission.notes}"` : '',
   ]

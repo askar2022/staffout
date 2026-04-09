@@ -2,6 +2,7 @@
 
 import { useState, useCallback, Fragment } from 'react'
 import { FileText, Search, Download, Printer, ChevronDown, ChevronUp, BarChart2, Clock } from 'lucide-react'
+import { formatPtoHours } from '@/lib/pto'
 
 const STATUS_LABELS: Record<string, string> = {
   absent: 'Absent',
@@ -87,9 +88,9 @@ export default function ReportsPage() {
         s.name,
         s.absent, s.late, s.leaving_early, s.appointment, s.personal_day, s.total,
         ...(hasPto ? [
-          s.pto_used_period > 0 ? s.pto_used_period : '',
-          s.pto_balance ?? '',
-          s.pto_remaining !== null ? s.pto_remaining : '',
+          s.pto_used_period > 0 ? formatPtoHours(s.pto_used_period, { suffix: false }) : '',
+          s.pto_balance !== null ? formatPtoHours(s.pto_balance, { suffix: false }) : '',
+          s.pto_remaining !== null ? formatPtoHours(s.pto_remaining, { suffix: false }) : '',
         ] : []),
       ]),
     ]
@@ -117,7 +118,7 @@ export default function ReportsPage() {
           s.name,
           d.date,
           STATUS_LABELS[d.status] ?? d.status,
-          ...(hasPto ? [d.pto_hours ? String(d.pto_hours) : ''] : []),
+          ...(hasPto ? [d.pto_hours ? formatPtoHours(d.pto_hours, { suffix: false }) : ''] : []),
         ])
       }
     }
@@ -330,14 +331,14 @@ export default function ReportsPage() {
                           <>
                             <td className="px-3 py-3.5 text-center hidden lg:table-cell">
                               {s.pto_balance !== null ? (
-                                <span className="text-sm font-semibold text-slate-700">{s.pto_balance}h</span>
+                                <span className="text-sm font-semibold text-slate-700">{formatPtoHours(s.pto_balance)}</span>
                               ) : (
                                 <span className="text-sm text-slate-300">—</span>
                               )}
                             </td>
                             <td className="px-3 py-3.5 text-center hidden lg:table-cell">
                               {s.pto_used_period > 0 ? (
-                                <span className="text-sm font-semibold text-indigo-600">{s.pto_used_period}h</span>
+                                <span className="text-sm font-semibold text-indigo-600">{formatPtoHours(s.pto_used_period)}</span>
                               ) : (
                                 <span className="text-sm text-slate-300">—</span>
                               )}
@@ -346,7 +347,7 @@ export default function ReportsPage() {
                               {s.pto_remaining !== null ? (
                                 <span className={`text-sm font-semibold ${
                                   s.pto_remaining <= 0 ? 'text-red-600' : s.pto_remaining <= 16 ? 'text-amber-600' : 'text-green-600'
-                                }`}>{s.pto_remaining}h</span>
+                                }`}>{formatPtoHours(s.pto_remaining)}</span>
                               ) : (
                                 <span className="text-sm text-slate-300">—</span>
                               )}

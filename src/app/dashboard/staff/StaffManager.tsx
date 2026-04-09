@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Plus, Pencil, X, Check, Users, Upload, Download, CheckCircle, AlertCircle, Archive, RotateCcw, RefreshCw, Clock } from 'lucide-react'
 import type { StaffMember } from '@/lib/types'
+import { formatPtoHours } from '@/lib/pto'
 
 interface Props {
   initialStaff: StaffMember[]
@@ -83,9 +84,9 @@ export default function StaffManager({ initialStaff }: Props) {
         member.campus ?? '',
         member.supervisor_name ?? '',
         member.supervisor_email ?? '',
-        member.pto_balance ?? '',
-        member.pto_used ?? '',
-        member.pto_remaining ?? '',
+        member.pto_balance !== null && member.pto_balance !== undefined ? formatPtoHours(member.pto_balance, { suffix: false }) : '',
+        member.pto_used !== null && member.pto_used !== undefined ? formatPtoHours(member.pto_used, { suffix: false }) : '',
+        member.pto_remaining !== null && member.pto_remaining !== undefined ? formatPtoHours(member.pto_remaining, { suffix: false }) : '',
         member.is_active === false ? 'Archived' : 'Active',
       ]),
     ]
@@ -450,20 +451,21 @@ export default function StaffManager({ initialStaff }: Props) {
             <p className="text-slate-500 font-medium">{showArchived ? 'No archived staff' : 'No active staff'}</p>
           </div>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1180px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Position</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Supervisor</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Campus</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Supervisor</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Campus</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />PTO Bank</span>
                 </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide hidden 2xl:table-cell">
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide whitespace-nowrap">
                   PTO Used
                 </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-green-600 uppercase tracking-wide hidden 2xl:table-cell">
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-green-600 uppercase tracking-wide whitespace-nowrap">
                   PTO Left
                 </th>
                 <th className="px-5 py-3.5" />
@@ -480,10 +482,10 @@ export default function StaffManager({ initialStaff }: Props) {
                     )}
                     {showArchived && <span className="text-xs text-amber-600 font-medium">Archived</span>}
                   </td>
-                  <td className="px-5 py-4 hidden sm:table-cell">
+                  <td className="px-5 py-4">
                     <p className="text-sm text-slate-600">{member.position || '—'}</p>
                   </td>
-                  <td className="px-5 py-4 hidden lg:table-cell">
+                  <td className="px-5 py-4">
                     {member.supervisor_name ? (
                       <div>
                         <p className="text-sm text-slate-700">{member.supervisor_name}</p>
@@ -493,29 +495,29 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 hidden md:table-cell">
+                  <td className="px-5 py-4">
                     <p className="text-sm text-slate-600">{member.campus || '—'}</p>
                   </td>
-                  <td className="px-5 py-4 hidden xl:table-cell">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     {member.pto_balance !== null && member.pto_balance !== undefined ? (
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
                         <Clock className="w-3 h-3" />
-                        {member.pto_balance}h
+                        {formatPtoHours(member.pto_balance)}
                       </span>
                     ) : (
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 hidden 2xl:table-cell">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     {member.pto_balance !== null && member.pto_balance !== undefined ? (
                       <span className="text-sm font-medium text-indigo-600">
-                        {member.pto_used ?? 0}h
+                        {formatPtoHours(member.pto_used ?? 0)}
                       </span>
                     ) : (
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 hidden 2xl:table-cell">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     {member.pto_remaining !== null && member.pto_remaining !== undefined ? (
                       <span className={`text-sm font-medium ${
                         member.pto_remaining <= 0
@@ -524,7 +526,7 @@ export default function StaffManager({ initialStaff }: Props) {
                           ? 'text-amber-600'
                           : 'text-green-600'
                       }`}>
-                        {member.pto_remaining}h
+                        {formatPtoHours(member.pto_remaining)}
                       </span>
                     ) : (
                       <span className="text-sm text-slate-400">—</span>
@@ -564,7 +566,8 @@ export default function StaffManager({ initialStaff }: Props) {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </div>

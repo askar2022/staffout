@@ -7,6 +7,15 @@ function roundHours(hours: number): number {
   return Math.round(hours * 100) / 100
 }
 
+export function formatPtoHours(value: number | null | undefined, options?: { suffix?: boolean }): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return ''
+
+  const rounded = roundHours(value)
+  const display = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, '')
+
+  return options?.suffix === false ? display : `${display}h`
+}
+
 export function parseTimeInputToMinutes(time: string | null | undefined): number | null {
   if (!time) return null
 

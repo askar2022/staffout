@@ -6,6 +6,7 @@ import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Pape
 import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
+import { formatPtoHours } from '@/lib/pto'
 
 type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
 
@@ -96,6 +97,8 @@ export default function SubmitPage() {
 function SubmitForm() {
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('email')
+  const timingNote =
+    'All staff: reports made after school and before 8:00 AM send at 8:00 AM. During school hours, they send instantly. Supervisors: immediate.'
 
   // Step 1 — email
   const [email, setEmail] = useState('')
@@ -327,13 +330,13 @@ function SubmitForm() {
                 {(ptoInfo.remaining ?? 0) < 0 ? (
                   <>
                     <span className="font-semibold">
-                      Over PTO by {Math.abs(ptoInfo.remaining ?? 0)}h
+                      Over PTO by {formatPtoHours(Math.abs(ptoInfo.remaining ?? 0))}
                     </span>
                     {' '}after this submission
                   </>
                 ) : (
                   <>
-                    <span className="font-semibold">{ptoInfo.remaining ?? 0}h PTO remaining</span>
+                    <span className="font-semibold">{formatPtoHours(ptoInfo.remaining ?? 0)} PTO remaining</span>
                     {' '}after this submission
                   </>
                 )}
@@ -342,7 +345,7 @@ function SubmitForm() {
           )}
           {submittedPtoDeducted !== null && submittedPtoDeducted > 0 && (
             <p className="mt-2 text-xs text-slate-500">
-              PTO deducted for this submission: {submittedPtoDeducted}h
+              PTO deducted for this submission: {formatPtoHours(submittedPtoDeducted)}
             </p>
           )}
           <button
@@ -393,9 +396,13 @@ function SubmitForm() {
             {step === 'email' && 'Enter your work email to get started'}
             {step === 'code' && 'Enter the code sent to your email'}
             {step === 'pick' && 'Select your name to continue'}
-            {step === 'form' &&
-              'All staff: reports made after school and before 8:00 AM send at 8:00 AM. During school hours, they send instantly. Supervisors: immediate.'}
+            {step === 'form' && 'Fill out the form below to notify your school.'}
           </p>
+          {(step === 'email' || step === 'form') && (
+            <p className="mt-3 max-w-2xl mx-auto text-xs text-indigo-100 bg-white/10 border border-white/15 rounded-xl px-3 py-2">
+              {timingNote}
+            </p>
+          )}
         </div>
       </div>
 
@@ -568,9 +575,11 @@ function SubmitForm() {
                 }`} />
                 <p className="text-sm">
                   <span className="font-semibold">
-                    {ptoInfo.remaining !== null ? `${ptoInfo.remaining}h PTO remaining` : '—'}
+                    {ptoInfo.remaining !== null ? `${formatPtoHours(ptoInfo.remaining)} PTO remaining` : '—'}
                   </span>
-                  <span className="text-slate-500 ml-1">({ptoInfo.used}h used of {ptoInfo.balance}h)</span>
+                  <span className="text-slate-500 ml-1">
+                    ({formatPtoHours(ptoInfo.used)} used of {formatPtoHours(ptoInfo.balance)})
+                  </span>
                 </p>
               </div>
             )}
