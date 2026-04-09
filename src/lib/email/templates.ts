@@ -533,8 +533,8 @@ export function buildSupervisorEmail(
         </div>
       ` : needsCoverage ? `
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:20px;">
-          <p style="margin:0;color:#991b1b;font-weight:600;font-size:14px;">⚠ Coverage may be needed for today.</p>
-          <p style="margin:8px 0 0;color:#b91c1c;font-size:14px;">Please review your team's schedule and arrange coverage as needed.</p>
+          <p style="margin:0;color:#991b1b;font-weight:700;font-size:14px;">⚠ Please arrange coverage for this employee.</p>
+          <p style="margin:8px 0 0;color:#b91c1c;font-size:14px;">${submission.staff_name} is ${throughLabel ? `out through ${throughLabel}` : 'out today'}. Please review your team's schedule and assign coverage as needed.</p>
         </div>
       ` : ''}
       
