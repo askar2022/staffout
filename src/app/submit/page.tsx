@@ -44,6 +44,10 @@ const ORG_LOGOS: Record<string, string> = {
   wva: '/WVA.jfif',
 }
 
+const ORG_HERO_BACKGROUNDS: Record<string, string> = {
+  hba: '/Beast_1-scaled.jpg',
+}
+
 // Full school names — overrides whatever short name is stored in the database
 const ORG_FULL_NAMES: Record<string, string> = {
   hba: 'Harvest Best Academy',
@@ -97,8 +101,6 @@ export default function SubmitPage() {
 function SubmitForm() {
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('email')
-  const timingNote =
-    'All staff: reports made after school and before 8:00 AM send at 8:00 AM. During school hours, they send instantly. Supervisors: immediate.'
 
   // Step 1 — email
   const [email, setEmail] = useState('')
@@ -165,6 +167,7 @@ function SubmitForm() {
   const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
 
   const isAfter8AM = new Date().getHours() >= 8
+  const heroBackground = orgSlug ? ORG_HERO_BACKGROUNDS[orgSlug] : null
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
@@ -379,7 +382,22 @@ function SubmitForm() {
   return (
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
-      <div className="bg-indigo-600 px-4 pb-20 text-center" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}>
+      <div
+        className="relative px-4 pb-20 text-center overflow-hidden"
+        style={
+          heroBackground
+            ? {
+                paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+                backgroundImage: `linear-gradient(rgba(49, 46, 129, 0.72), rgba(79, 70, 229, 0.82)), url("${heroBackground}")`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+            : {
+                paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+                background: '#4f46e5',
+              }
+        }
+      >
         <div className="max-w-lg mx-auto">
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
@@ -392,17 +410,6 @@ function SubmitForm() {
           </div>
           {/* Step context */}
           <h1 className="text-xl font-bold text-white mb-1">Report your absence</h1>
-          <p className="text-indigo-200 text-sm">
-            {step === 'email' && 'Enter your work email to get started'}
-            {step === 'code' && 'Enter the code sent to your email'}
-            {step === 'pick' && 'Select your name to continue'}
-            {step === 'form' && 'Fill out the form below to notify your school.'}
-          </p>
-          {(step === 'email' || step === 'form') && (
-            <p className="mt-3 max-w-2xl mx-auto text-xs text-indigo-100 bg-white/10 border border-white/15 rounded-xl px-3 py-2">
-              {timingNote}
-            </p>
-          )}
         </div>
       </div>
 
