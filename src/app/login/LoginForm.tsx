@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -20,6 +20,25 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const loginInFlight = useRef(false)
+  /** False until we clear stale cookies — stops Chrome refresh-token storms (429 loops) */
+  const [authReady, setAuthReady] = useState(false)
+
+  useLayoutEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        // Stale or cross-subdomain cookies make the client spam /token?grant_type=refresh_token → 429 → hang
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch {
+        // ignore
+      }
+      if (!cancelled) setAuthReady(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function formatAuthError(message: string | undefined): string {
     if (!message) return 'Sign in failed'
@@ -27,12 +46,15 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
     if (lower.includes('rate limit') || lower.includes('too many requests')) {
       return 'Too many sign-in attempts were detected. Wait 10–15 minutes, then try again. If this keeps happening in Chrome, close other OutOfShift tabs, turn off extensions, or try another browser.'
     }
+    if (lower.includes('timeout') || lower.includes('network') || lower.includes('fetch')) {
+      return 'Connection timed out. In Chrome: Settings → Privacy → clear cookies for outofshift.com, close all OutOfShift tabs, then try again.'
+    }
     return message
   }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    if (loginInFlight.current || loading) return
+    if (!authReady || loginInFlight.current || loading) return
     loginInFlight.current = true
     setLoading(true)
     setError('')
@@ -58,6 +80,7 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
   }
 
   async function handleForgotPassword() {
+    if (!authReady) return
     if (!email) {
       setError('Enter your email address above first, then click Forgot password.')
       return
@@ -137,10 +160,10 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !authReady}
               className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {!authReady ? 'Preparing…' : loading ? 'Signing in...' : 'Sign in'}
             </button>
 
             {resetSent ? (
@@ -152,8 +175,8 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
               <button
                 type="button"
                 onClick={handleForgotPassword}
-                disabled={resetLoading}
-                className="w-full text-sm text-slate-400 hover:text-indigo-600 transition-colors text-center"
+                disabled={resetLoading || !authReady}
+                className="w-full text-sm text-slate-400 hover:text-indigo-600 transition-colors text-center disabled:opacity-50"
               >
                 {resetLoading ? 'Sending...' : 'Forgot password?'}
               </button>
