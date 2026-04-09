@@ -168,7 +168,7 @@ function SubmitForm() {
 
   const isAfter8AM = new Date().getHours() >= 8
   const heroBackground = orgSlug ? ORG_HERO_BACKGROUNDS[orgSlug] : null
-  const useFullscreenHero = step === 'email' && !!heroBackground
+  const useFullscreenHero = (step === 'email' || step === 'code') && !!heroBackground
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
@@ -411,47 +411,107 @@ function SubmitForm() {
               </h1>
             </div>
 
-            <form onSubmit={handleSendCode} className="w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
-              <div className="p-6">
-                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
-                  <Mail className="w-6 h-6 text-indigo-600" />
-                </div>
-                <h2 className="text-lg font-bold text-slate-900 mb-1">Enter your work email</h2>
-                <p className="text-slate-500 text-sm mb-5">
-                  We will send a 6-digit verification code to confirm your identity.
-                </p>
-
-                {sendError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
-                    {sendError}
+            {step === 'email' ? (
+              <form onSubmit={handleSendCode} className="w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
+                <div className="p-6">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
+                    <Mail className="w-6 h-6 text-indigo-600" />
                   </div>
-                )}
+                  <h2 className="text-lg font-bold text-slate-900 mb-1">Enter your work email</h2>
+                  <p className="text-slate-500 text-sm mb-5">
+                    We will send a 6-digit verification code to confirm your identity.
+                  </p>
 
-                <input
-                  type="email"
-                  required
-                  autoFocus
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="yourname@school.org"
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 bg-white"
-                />
+                  {sendError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
+                      {sendError}
+                    </div>
+                  )}
 
-                <button
-                  type="submit"
-                  disabled={sendingCode || !email}
-                  className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {sendingCode ? 'Sending code...' : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
-                </button>
-              </div>
-              <div className="px-6 pb-5">
-                <p className="text-xs text-slate-400 text-center">
-                  Admin?{' '}
-                  <Link href="/login" className="text-indigo-500 hover:underline">Sign in to dashboard</Link>
-                </p>
-              </div>
-            </form>
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="yourname@school.org"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 bg-white"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={sendingCode || !email}
+                    className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {sendingCode ? 'Sending code...' : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
+                  </button>
+                </div>
+                <div className="px-6 pb-5">
+                  <p className="text-xs text-slate-400 text-center">
+                    Admin?{' '}
+                    <Link href="/login" className="text-indigo-500 hover:underline">Sign in to dashboard</Link>
+                  </p>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyCode} className="w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
+                <div className="p-6">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+                    <ShieldCheck className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900 mb-1">Check your email</h2>
+                  <p className="text-slate-500 text-sm mb-1">
+                    We sent a 6-digit code to:
+                  </p>
+                  <p className="font-semibold text-slate-800 text-sm mb-5">{email}</p>
+
+                  {verifyError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
+                      {verifyError}
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    required
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-4 text-3xl font-bold text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 font-mono bg-white"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={verifying || code.length !== 6}
+                    className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {verifying ? 'Verifying...' : <>Verify code <ShieldCheck className="w-4 h-4" /></>}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep('email')
+                      setCode('')
+                      setVerifyError('')
+                    }}
+                    className="w-full mt-3 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Use a different email or resend code
+                  </button>
+                </div>
+                <div className="px-6 pb-4 bg-slate-50/80 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 text-center pt-3">
+                    Code expires in 10 minutes · Check your spam folder if you don't see it
+                  </p>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
@@ -462,47 +522,25 @@ function SubmitForm() {
     <div className="min-h-screen bg-slate-50 pb-10 pb-safe">
       {/* Header */}
       <div
-        className={`relative px-4 text-center overflow-hidden ${heroBackground ? 'pb-16 min-h-[280px]' : 'pb-14'}`}
-        style={
-          heroBackground
-            ? { paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }
-            : {
-                paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
-                background: '#4f46e5',
-              }
-        }
+        className="relative px-4 pb-12 text-center overflow-hidden bg-indigo-600"
+        style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}
       >
-        {heroBackground && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={heroBackground}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: 'center 38%' }}
-            />
-            <div className="absolute inset-0 bg-slate-950/10" />
-            <div className="absolute inset-0 bg-gradient-to-b from-indigo-950/10 via-transparent to-indigo-950/35" />
-          </>
-        )}
-
         <div className="relative max-w-lg mx-auto">
           {/* Logo + app name */}
           <div className="flex flex-col items-center mb-5">
             <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
-            <span className="text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)] font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
+            <span className="text-white font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
               {orgSlug && ORG_FULL_NAMES[orgSlug]
                 ? ORG_FULL_NAMES[orgSlug]
                 : 'OutOfShift'}
             </span>
           </div>
           {/* Step context */}
-          <h1 className="text-xl font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)] mb-1">Report your absence</h1>
+          <h1 className="text-xl font-bold text-white mb-1">Report your absence</h1>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-8">
+      <div className="max-w-lg mx-auto px-4 mt-6">
 
         {/* ── Step 1: Email ── */}
         {step === 'email' && (
