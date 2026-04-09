@@ -382,17 +382,17 @@ function SubmitForm() {
 
   if (useFullscreenHero && (step === 'email' || step === 'code')) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 md:bg-slate-950">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={heroBackground}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: 'center center' }}
+          className="absolute inset-0 h-full w-full object-cover object-[58%_18%] scale-110 md:scale-100 md:object-center"
         />
-        <div className="absolute inset-0 bg-slate-950/35" />
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/25 via-transparent to-slate-950/30" />
+        <div className="absolute inset-0 bg-slate-950/30 md:bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-slate-950/25 md:from-indigo-950/25 md:to-slate-950/30" />
+        <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-b from-transparent via-slate-50/80 to-slate-50 md:hidden" />
 
         <div
           className="relative min-h-screen px-4"
@@ -520,17 +520,17 @@ function SubmitForm() {
 
   if (useFullscreenHero && step === 'form') {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-slate-950 pb-10 pb-safe">
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 md:bg-slate-950 pb-10 pb-safe">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={heroBackground}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: 'center center' }}
+          className="absolute inset-0 h-full w-full object-cover object-[58%_18%] scale-110 md:scale-100 md:object-center"
         />
-        <div className="absolute inset-0 bg-slate-950/35" />
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/25 via-transparent to-slate-950/30" />
+        <div className="absolute inset-0 bg-slate-950/30 md:bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-slate-950/25 md:from-indigo-950/25 md:to-slate-950/30" />
+        <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-b from-transparent via-slate-50/82 to-slate-50 md:hidden" />
 
         <div
           className="relative px-4"
