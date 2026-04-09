@@ -75,6 +75,45 @@ export default function StaffManager({ initialStaff }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  function exportCurrentStaffCSV() {
+    const rows = [
+      [
+        'Employee ID',
+        'Full Name',
+        'Email',
+        'Position',
+        'Campus',
+        'Supervisor Name',
+        'Supervisor Email',
+        'PTO Bank',
+        'PTO Used',
+        'PTO Left',
+        'Status',
+      ],
+      ...visibleStaff.map((member) => [
+        member.employee_id ?? '',
+        member.full_name,
+        member.email ?? '',
+        member.position ?? '',
+        member.campus ?? '',
+        member.supervisor_name ?? '',
+        member.supervisor_email ?? '',
+        member.pto_balance ?? '',
+        member.pto_used ?? '',
+        member.pto_remaining ?? '',
+        member.is_active === false ? 'Archived' : 'Active',
+      ]),
+    ]
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = showArchived ? 'staff-directory-archived.csv' : 'staff-directory-active.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -241,7 +280,14 @@ export default function StaffManager({ initialStaff }: Props) {
             className="flex items-center gap-2 text-sm font-medium text-slate-600 border border-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <Download className="w-4 h-4" />
-            Download CSV Template
+            Download Import Template
+          </button>
+          <button
+            onClick={exportCurrentStaffCSV}
+            className="flex items-center gap-2 text-sm font-medium text-indigo-700 border border-indigo-200 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export Current Table
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
