@@ -64,8 +64,8 @@ export function buildConfirmationEmail(
             <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_hours_deducted} hours</td>
           </tr>` : ''}
           ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr>
-            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
-            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_remaining_after} hours</td>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">${submission.pto_remaining_after < 0 ? 'PTO Overage' : 'PTO Remaining'}</td>
+            <td style="font-size:13px;font-weight:600;color:${submission.pto_remaining_after < 0 ? '#b91c1c' : '#0f172a'};padding:4px 0;">${submission.pto_remaining_after < 0 ? `${Math.abs(submission.pto_remaining_after)} hours over balance` : `${submission.pto_remaining_after} hours`}</td>
           </tr>` : ''}
           ${submission.notes ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">Notes</td>
@@ -105,7 +105,9 @@ export function buildConfirmationEmail(
       ? `PTO Deducted: ${submission.pto_hours_deducted} hours`
       : '',
     submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
-      ? `PTO Remaining: ${submission.pto_remaining_after} hours`
+      ? submission.pto_remaining_after < 0
+        ? `PTO Overage: ${Math.abs(submission.pto_remaining_after)} hours over balance`
+        : `PTO Remaining: ${submission.pto_remaining_after} hours`
       : '',
     submission.notes ? `Notes: ${submission.notes}` : '',
     ``,
@@ -200,6 +202,116 @@ export function buildHrExcuseEmail(
     submission.hr_note ? `HR Note: ${submission.hr_note}` : '',
     ``,
     `Reminder: Please submit your own absence using the OutOfShift form next time.`,
+  ].filter(Boolean).join('\n')
+
+  return { subject, html, text }
+}
+
+export function buildPtoOverageEmail(
+  orgName: string,
+  submission: Submission
+): { subject: string; html: string; text: string } {
+  const statusLabel = STATUS_LABELS[submission.status] ?? submission.status
+  const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+  const throughStr = submission.end_date
+    ? format(new Date(submission.end_date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+    : null
+  const remaining = submission.pto_remaining_after ?? null
+  const overageHours = remaining !== null && remaining < 0 ? Math.abs(remaining) : 0
+  const ptoUsedTotal = submission.pto_used_total ?? null
+
+  const subject = `PTO Alert — ${submission.staff_name} is over balance by ${overageHours}h`
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+    <div style="background:#dc2626;height:5px;"></div>
+
+    <div style="padding:28px 32px 20px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#dc2626;margin-bottom:6px;">
+        ${orgName} — PTO Alert
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
+        ${submission.staff_name} is over PTO balance
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px;">Over balance by ${overageHours} hours</div>
+    </div>
+
+    <div style="padding:0 32px 24px;">
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px 16px;margin-bottom:18px;font-size:14px;color:#991b1b;line-height:1.6;">
+        This submission was accepted, but the employee now has a negative PTO balance and may need follow-up from HR.
+      </div>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:10px;">Submission Details</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;width:140px;">Employee</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.staff_name}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Status</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${statusLabel}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Date</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${dateStr}</td>
+          </tr>
+          ${throughStr ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Through</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${throughStr}</td>
+          </tr>` : ''}
+          ${submission.pto_balance_total !== null && submission.pto_balance_total !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Bank</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_balance_total} hours</td>
+          </tr>` : ''}
+          ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Deducted</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.pto_hours_deducted} hours</td>
+          </tr>` : ''}
+          ${ptoUsedTotal !== null && ptoUsedTotal !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Used Total</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${ptoUsedTotal} hours</td>
+          </tr>` : ''}
+          ${remaining !== null ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
+            <td style="font-size:13px;font-weight:700;color:#b91c1c;padding:4px 0;">${remaining} hours</td>
+          </tr>` : ''}
+        </table>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        This HR-only alert was sent by <strong style="color:#64748b;">${orgName}</strong>. Please do not reply.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const text = [
+    `PTO Alert — ${orgName}`,
+    ``,
+    `${submission.staff_name} is over PTO balance by ${overageHours} hours.`,
+    `Status: ${statusLabel}`,
+    `Date: ${dateStr}`,
+    throughStr ? `Through: ${throughStr}` : '',
+    submission.pto_balance_total !== null && submission.pto_balance_total !== undefined
+      ? `PTO Bank: ${submission.pto_balance_total} hours`
+      : '',
+    submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
+      ? `PTO Deducted: ${submission.pto_hours_deducted} hours`
+      : '',
+    ptoUsedTotal !== null && ptoUsedTotal !== undefined
+      ? `PTO Used Total: ${ptoUsedTotal} hours`
+      : '',
+    remaining !== null ? `PTO Remaining: ${remaining} hours` : '',
+    ``,
+    `This submission was accepted, but HR follow-up may be needed.`,
   ].filter(Boolean).join('\n')
 
   return { subject, html, text }

@@ -307,11 +307,28 @@ function SubmitForm() {
             {status && <> · <span className="text-indigo-600">{STATUS_LABELS[status]}</span></>}
           </div>
           {ptoInfo?.balance !== null && ptoInfo !== null && (
-            <div className="mt-3 py-2.5 px-4 bg-indigo-50 rounded-xl text-sm text-indigo-700 flex items-center gap-2">
+            <div
+              className={`mt-3 py-2.5 px-4 rounded-xl text-sm flex items-center gap-2 ${
+                (ptoInfo.remaining ?? 0) < 0
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-indigo-50 text-indigo-700'
+              }`}
+            >
               <Clock className="w-4 h-4 shrink-0" />
               <span>
-                <span className="font-semibold">{Math.max(0, (ptoInfo.remaining ?? 0))}h PTO remaining</span>
-                {' '}after this submission
+                {(ptoInfo.remaining ?? 0) < 0 ? (
+                  <>
+                    <span className="font-semibold">
+                      Over PTO by {Math.abs(ptoInfo.remaining ?? 0)}h
+                    </span>
+                    {' '}after this submission
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold">{ptoInfo.remaining ?? 0}h PTO remaining</span>
+                    {' '}after this submission
+                  </>
+                )}
               </span>
             </div>
           )}

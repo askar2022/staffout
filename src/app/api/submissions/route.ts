@@ -2,7 +2,12 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
-import { buildInstantEmail, buildSupervisorEmail, buildConfirmationEmail } from '@/lib/email/templates'
+import {
+  buildInstantEmail,
+  buildSupervisorEmail,
+  buildConfirmationEmail,
+  buildPtoOverageEmail,
+} from '@/lib/email/templates'
 import type { Submission, NotificationRecipient } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
@@ -177,6 +182,8 @@ export async function POST(request: NextRequest) {
 
     const sub = {
       ...(submission as Submission),
+      pto_balance_total: ptoBalance,
+      pto_used_total: ptoUsedBefore + (ptoHoursDeducted ?? 0),
       pto_remaining_after:
         ptoBalance !== null
           ? ptoBalance - ptoUsedBefore - (ptoHoursDeducted ?? 0)
@@ -212,6 +219,39 @@ export async function POST(request: NextRequest) {
         subject,
         submission_id: submission.id,
       })
+    }
+
+    if ((sub.pto_remaining_after ?? 0) < 0) {
+      const { data: hrRecipientsRaw } = await db
+        .from('notification_recipients')
+        .select('email')
+        .eq('organization_id', orgId)
+        .eq('type', 'hr')
+
+      const hrEmails = Array.from(
+        new Set((hrRecipientsRaw ?? []).map((recipient: { email: string }) => recipient.email))
+      )
+
+      if (hrEmails.length > 0) {
+        const { subject, html, text } = buildPtoOverageEmail(org.name, sub)
+        const result = await sendEmail({
+          to: hrEmails,
+          subject,
+          html,
+          text,
+          replyTo: org.reply_to_email ?? undefined,
+        })
+
+        await db.from('email_logs').insert({
+          organization_id: orgId,
+          type: 'instant',
+          recipients: hrEmails,
+          subject,
+          submission_id: submission.id,
+          success: result.success,
+          error_message: result.success ? null : result.error,
+        })
+      }
     }
 
     // All-staff instant alert only during school hours (8 AM – 3:30 PM CT)

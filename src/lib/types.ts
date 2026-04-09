@@ -69,6 +69,8 @@ export interface Submission {
   notes: string | null
   pto_hours_deducted: number | null
   pto_remaining_after?: number | null
+  pto_balance_total?: number | null
+  pto_used_total?: number | null
   lesson_plan_url: string | null
   hr_excused: boolean
   hr_note: string | null
