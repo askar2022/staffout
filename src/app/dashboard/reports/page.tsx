@@ -78,7 +78,7 @@ export default function ReportsPage() {
       ...(hasEmployeeId ? ['Employee ID'] : []),
       'Staff Name',
       'Absent', 'Late', 'Left Early', 'Appointment', 'Personal Day', 'Total',
-      ...(hasPto ? ['PTO Used (Period)', 'PTO Balance (Total)', 'PTO Remaining'] : []),
+      ...(hasPto ? ['PTO Used (Period)', 'PTO Bank', 'PTO Remaining'] : []),
     ]
     const rows = [
       headers,
@@ -277,6 +277,9 @@ export default function ReportsPage() {
                     <th className="text-center px-5 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wide">Total</th>
                     {hasPto && (
                       <>
+                        <th className="text-center px-3 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wide hidden lg:table-cell">
+                          PTO Bank
+                        </th>
                         <th className="text-center px-3 py-3 text-xs font-semibold text-indigo-500 uppercase tracking-wide hidden lg:table-cell">
                           <span className="flex items-center justify-center gap-1"><Clock className="w-3 h-3" />PTO Used</span>
                         </th>
@@ -326,6 +329,13 @@ export default function ReportsPage() {
                         {hasPto && (
                           <>
                             <td className="px-3 py-3.5 text-center hidden lg:table-cell">
+                              {s.pto_balance !== null ? (
+                                <span className="text-sm font-semibold text-slate-700">{s.pto_balance}h</span>
+                              ) : (
+                                <span className="text-sm text-slate-300">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center hidden lg:table-cell">
                               {s.pto_used_period > 0 ? (
                                 <span className="text-sm font-semibold text-indigo-600">{s.pto_used_period}h</span>
                               ) : (
@@ -348,7 +358,7 @@ export default function ReportsPage() {
                       {/* Expanded detail rows */}
                       {expandedName === s.name && (
                         <tr>
-                          <td colSpan={hasPto ? 9 : 7} className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+                          <td colSpan={hasPto ? 10 : 7} className="px-5 py-3 bg-slate-50 border-b border-slate-200">
                             <div className="flex flex-wrap gap-2">
                               {s.dates.map((d, i) => (
                                 <span

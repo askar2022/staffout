@@ -434,7 +434,13 @@ export default function StaffManager({ initialStaff }: Props) {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Supervisor</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Campus</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">
-                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />PTO Hours</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />PTO Bank</span>
+                </th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide hidden 2xl:table-cell">
+                  PTO Used
+                </th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-green-600 uppercase tracking-wide hidden 2xl:table-cell">
+                  PTO Left
                 </th>
                 <th className="px-5 py-3.5" />
               </tr>
@@ -471,6 +477,30 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
                         <Clock className="w-3 h-3" />
                         {member.pto_balance}h
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4 hidden 2xl:table-cell">
+                    {member.pto_balance !== null && member.pto_balance !== undefined ? (
+                      <span className="text-sm font-medium text-indigo-600">
+                        {member.pto_used ?? 0}h
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4 hidden 2xl:table-cell">
+                    {member.pto_remaining !== null && member.pto_remaining !== undefined ? (
+                      <span className={`text-sm font-medium ${
+                        member.pto_remaining <= 0
+                          ? 'text-red-600'
+                          : member.pto_remaining <= 16
+                          ? 'text-amber-600'
+                          : 'text-green-600'
+                      }`}>
+                        {member.pto_remaining}h
                       </span>
                     ) : (
                       <span className="text-sm text-slate-400">—</span>

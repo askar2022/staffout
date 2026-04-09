@@ -8,11 +8,39 @@ export default async function StaffPage() {
   const orgId = await getOrgId()
   const db = createAdminClient()
 
-  const { data: staffMembers } = await db
-    .from('staff_members')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('full_name')
+  const [{ data: staffMembers }, { data: ptoRows }] = await Promise.all([
+    db
+      .from('staff_members')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('full_name'),
+    db
+      .from('submissions')
+      .select('staff_id, pto_hours_deducted')
+      .eq('organization_id', orgId)
+      .not('pto_hours_deducted', 'is', null),
+  ])
+
+  const ptoUsedByStaff = new Map<string, number>()
+  for (const row of ptoRows ?? []) {
+    if (!row.staff_id) continue
+    ptoUsedByStaff.set(
+      row.staff_id,
+      (ptoUsedByStaff.get(row.staff_id) ?? 0) + (row.pto_hours_deducted ?? 0)
+    )
+  }
+
+  const staffWithPto = ((staffMembers ?? []) as StaffMember[]).map((member) => {
+    const used = ptoUsedByStaff.get(member.id) ?? 0
+    return {
+      ...member,
+      pto_used: used,
+      pto_remaining:
+        member.pto_balance !== null && member.pto_balance !== undefined
+          ? member.pto_balance - used
+          : null,
+    }
+  })
 
   return (
     <div className="p-8 max-w-5xl">
@@ -26,7 +54,7 @@ export default async function StaffPage() {
         </div>
       </div>
 
-      <StaffManager initialStaff={(staffMembers ?? []) as StaffMember[]} orgId={orgId ?? ''} />
+      <StaffManager initialStaff={staffWithPto} orgId={orgId ?? ''} />
     </div>
   )
 }

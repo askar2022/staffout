@@ -45,6 +45,8 @@ export interface StaffMember {
   is_active: boolean
   pto_balance: number | null
   employee_id: string | null
+  pto_used?: number
+  pto_remaining?: number | null
   created_at: string
 }
 
