@@ -30,6 +30,8 @@ export default function HrExcuseForm({ onClose, onSuccess }: Props) {
   const [staffId, setStaffId] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [status, setStatus] = useState('absent')
+  const [expectedArrival, setExpectedArrival] = useState('')
+  const [leaveTime, setLeaveTime] = useState('')
   const [reasonCategory, setReasonCategory] = useState('')
   const [notes, setNotes] = useState('')
   const [hrNote, setHrNote] = useState('')
@@ -51,13 +53,24 @@ export default function HrExcuseForm({ onClose, onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!staffId) { setError('Please select a staff member'); return }
+    if (status === 'late' && !expectedArrival) { setError('Please enter the expected arrival time'); return }
+    if (status === 'leaving_early' && !leaveTime) { setError('Please enter the leave time'); return }
     setSubmitting(true)
     setError('')
 
     const res = await fetch('/api/submissions/hr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staff_id: staffId, date, status, reason_category: reasonCategory || null, notes: notes || null, hr_note: hrNote || null }),
+      body: JSON.stringify({
+        staff_id: staffId,
+        date,
+        status,
+        expected_arrival: status === 'late' ? expectedArrival : null,
+        leave_time: status === 'leaving_early' ? leaveTime : null,
+        reason_category: reasonCategory || null,
+        notes: notes || null,
+        hr_note: hrNote || null,
+      }),
     })
 
     const data = await res.json()
@@ -165,6 +178,32 @@ export default function HrExcuseForm({ onClose, onSuccess }: Props) {
                 </select>
               </div>
             </div>
+
+            {status === 'late' && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Expected Arrival Time *</label>
+                <input
+                  type="time"
+                  value={expectedArrival}
+                  onChange={(e) => setExpectedArrival(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-xs text-slate-400 mt-1">PTO will be deducted from 8:00 AM to the selected arrival time.</p>
+              </div>
+            )}
+
+            {status === 'leaving_early' && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Leave Time *</label>
+                <input
+                  type="time"
+                  value={leaveTime}
+                  onChange={(e) => setLeaveTime(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-xs text-slate-400 mt-1">PTO will be deducted from the selected leave time until 4:00 PM.</p>
+              </div>
+            )}
 
             {/* HR internal note */}
             <div>

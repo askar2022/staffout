@@ -240,6 +240,14 @@ function SubmitForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!status) return
+    if (status === 'late' && !expectedArrival) {
+      setSubmitError('Please enter your expected arrival time.')
+      return
+    }
+    if (status === 'leaving_early' && !leaveTime) {
+      setSubmitError('Please enter the time you are leaving.')
+      return
+    }
 
     setSubmitting(true)
     setSubmitError('')
@@ -633,6 +641,7 @@ function SubmitForm() {
                     onChange={(e) => setExpectedArrival(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <p className="mt-1 text-xs text-slate-400">PTO will be deducted from 8:00 AM to the time you select.</p>
                 </div>
               )}
 
@@ -647,6 +656,7 @@ function SubmitForm() {
                     onChange={(e) => setLeaveTime(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <p className="mt-1 text-xs text-slate-400">PTO will be deducted from the time you select until 4:00 PM.</p>
                 </div>
               )}
 

@@ -6,8 +6,6 @@ import type { NotificationRecipient, Organization, PtoDeductionSetting } from '@
 
 const PTO_RULE_LABELS: Record<string, string> = {
   absent: 'Absent (full day)',
-  late: 'Late Arrival',
-  leaving_early: 'Leaving Early',
 }
 
 interface Props {
@@ -200,7 +198,7 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
           PTO Deduction Rules
         </h2>
         <p className="text-sm text-slate-500 mb-5">
-          How many hours are automatically deducted per day for each absence type.
+          Full-day absences use this fixed PTO rule. Late arrivals deduct from 8:00 AM to the selected arrival time, and leaving early deducts from the selected time until 4:00 PM.
         </p>
 
         {ptoSettings.length === 0 ? (

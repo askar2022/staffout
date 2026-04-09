@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
+import { calculateTimedPtoHours } from '@/lib/pto'
 import {
   buildInstantEmail,
   buildSupervisorEmail,
@@ -56,6 +57,8 @@ export async function POST(request: NextRequest) {
 
     const reasonCategory = sanitize(body.reason_category, 50)
     if (reasonCategory && !ALLOWED_REASONS.includes(reasonCategory)) return apiError('Invalid reason')
+    const expectedArrival = sanitize(body.expected_arrival, 10) || null
+    const leaveTime = sanitize(body.leave_time, 10) || null
 
     // Verify the org exists
     const { data: org } = await db
@@ -130,16 +133,30 @@ export async function POST(request: NextRequest) {
     // Auto-calculate PTO hours to deduct
     let ptoHoursDeducted: number | null = null
     if (staffId) {
-      const { data: ptoSetting } = await db
-        .from('pto_deduction_settings')
-        .select('hours_per_day')
-        .eq('organization_id', orgId)
-        .eq('status', status)
-        .single()
+      if (status === 'late') {
+        if (!expectedArrival) return apiError('Expected arrival time is required')
 
-      const hoursPerDay = ptoSetting?.hours_per_day ?? 0
-      if (hoursPerDay > 0) {
-        ptoHoursDeducted = hoursPerDay * numDays
+        const timedHours = calculateTimedPtoHours({ status: 'late', expectedArrival })
+        if (timedHours === null) return apiError('Invalid expected arrival time')
+        ptoHoursDeducted = timedHours
+      } else if (status === 'leaving_early') {
+        if (!leaveTime) return apiError('Leave time is required')
+
+        const timedHours = calculateTimedPtoHours({ status: 'leaving_early', leaveTime })
+        if (timedHours === null) return apiError('Invalid leave time')
+        ptoHoursDeducted = timedHours
+      } else {
+        const { data: ptoSetting } = await db
+          .from('pto_deduction_settings')
+          .select('hours_per_day')
+          .eq('organization_id', orgId)
+          .eq('status', status)
+          .single()
+
+        const hoursPerDay = ptoSetting?.hours_per_day ?? 0
+        if (hoursPerDay > 0) {
+          ptoHoursDeducted = hoursPerDay * numDays
+        }
       }
     }
 
@@ -163,8 +180,8 @@ export async function POST(request: NextRequest) {
         status,
         date,
         end_date: endDate,
-        expected_arrival: sanitize(body.expected_arrival, 10) || null,
-        leave_time: sanitize(body.leave_time, 10) || null,
+        expected_arrival: expectedArrival,
+        leave_time: leaveTime,
         reason_category: reasonCategory || null,
         notes: sanitize(body.notes, 500) || null,
         pto_hours_deducted: ptoHoursDeducted,
