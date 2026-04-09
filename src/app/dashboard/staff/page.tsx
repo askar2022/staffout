@@ -43,7 +43,7 @@ export default async function StaffPage() {
   })
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-4 lg:p-8 max-w-[92rem] mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">

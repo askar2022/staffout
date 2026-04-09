@@ -452,29 +452,29 @@ export default function StaffManager({ initialStaff }: Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px]">
+            <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Supervisor</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Campus</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Supervisor</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Campus</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />PTO Bank</span>
                 </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide whitespace-nowrap">
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide whitespace-nowrap">
                   PTO Used
                 </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-green-600 uppercase tracking-wide whitespace-nowrap">
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-green-600 uppercase tracking-wide whitespace-nowrap">
                   PTO Left
                 </th>
-                <th className="px-5 py-3.5" />
+                <th className="px-4 py-3.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visibleStaff.map((member) => (
                 <tr key={member.id} className={`hover:bg-slate-50 transition-colors ${showArchived ? 'opacity-70' : ''}`}>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 min-w-[180px]">
                     <p className="text-sm font-semibold text-slate-900">{member.full_name}</p>
                     {member.email && <p className="text-xs text-slate-400">{member.email}</p>}
                     {member.employee_id && (
@@ -482,10 +482,10 @@ export default function StaffManager({ initialStaff }: Props) {
                     )}
                     {showArchived && <span className="text-xs text-amber-600 font-medium">Archived</span>}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 min-w-[150px]">
                     <p className="text-sm text-slate-600">{member.position || '—'}</p>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 min-w-[180px]">
                     {member.supervisor_name ? (
                       <div>
                         <p className="text-sm text-slate-700">{member.supervisor_name}</p>
@@ -495,10 +495,10 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 min-w-[90px]">
                     <p className="text-sm text-slate-600">{member.campus || '—'}</p>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {member.pto_balance !== null && member.pto_balance !== undefined ? (
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
                         <Clock className="w-3 h-3" />
@@ -508,7 +508,7 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {member.pto_balance !== null && member.pto_balance !== undefined ? (
                       <span className="text-sm font-medium text-indigo-600">
                         {formatPtoHours(member.pto_used ?? 0)}
@@ -517,7 +517,7 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {member.pto_remaining !== null && member.pto_remaining !== undefined ? (
                       <span className={`text-sm font-medium ${
                         member.pto_remaining <= 0
@@ -532,7 +532,7 @@ export default function StaffManager({ initialStaff }: Props) {
                       <span className="text-sm text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 sticky right-0 bg-white">
                     <div className="flex items-center gap-1 justify-end">
                       {showArchived ? (
                         <button
