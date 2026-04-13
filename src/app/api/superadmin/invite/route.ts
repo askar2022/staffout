@@ -13,7 +13,8 @@ async function requireSuperAdmin() {
 }
 
 // POST — invite a school admin by email
-// Sends a Supabase invite that lands on {slug}.outofshift.com/setup
+// Sends a Supabase invite that lands on the school subdomain callback,
+// then goes to password setup before finishing school setup.
 export async function POST(request: NextRequest) {
   try {
     await requireSuperAdmin()
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (!org.slug) return apiError('Set a subdomain slug for this school before inviting admins', 400)
 
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-    const redirectTo = `https://${org.slug}.${rootDomain}/setup`
+    const redirectTo = `https://${org.slug}.${rootDomain}/auth/callback?next=/auth/reset-password`
 
     // Send Supabase invite — creates the auth user and emails a magic setup link
     const { error: inviteError } = await db.auth.admin.inviteUserByEmail(email, {
