@@ -138,7 +138,7 @@ export default function PlatformAdminDashboard() {
       body: JSON.stringify({ org_id: orgId, email }),
     })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to send invite')
+    if (!res.ok) throw new Error(getFriendlyPlatformAdminError(data.error || 'Failed to send invite'))
   }
 
   async function handleSlugUpdate(orgId: string, newSlug: string) {

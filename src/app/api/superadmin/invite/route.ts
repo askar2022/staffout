@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
         return apiError(`This email already has an account. Ask them to sign in at ${loginUrl} or use Send reset link.`, 409)
       }
 
+      if (inviteError.message?.toLowerCase().includes('rate limit')) {
+        return apiError('Too many invite emails were sent. Please wait a few minutes and try again.', 429)
+      }
+
       if (inviteError.message?.toLowerCase().includes('database error saving new user')) {
         return apiError(
           `Supabase could not create the invited auth user for ${cleanEmail}. This usually means there is still a Supabase Auth-side issue, not an HBA school setup issue. Check Authentication > Auth Hooks and any custom invite email template settings.`,
