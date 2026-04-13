@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Zap, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react'
+import { SCHOOL_HERO_BACKGROUNDS, SCHOOL_LOGOS, getSchoolDisplayName } from '@/lib/school-branding'
 
 interface Props {
   orgName: string | null
@@ -98,22 +99,188 @@ export default function LoginForm({ orgName, orgSlug, isPlatformAdminHost }: Pro
   }
 
   const isSchoolSubdomain = !!orgSlug
+  const displayName = getSchoolDisplayName(orgSlug, orgName)
+  const heroBackground = orgSlug ? SCHOOL_HERO_BACKGROUNDS[orgSlug] : null
+  const logoSrc = orgSlug ? SCHOOL_LOGOS[orgSlug] : null
+
+  function BrandLogo() {
+    const [imgError, setImgError] = useState(false)
+
+    if (logoSrc && !imgError) {
+      return (
+        <div className={`${heroBackground ? 'w-20 h-20 bg-white' : 'w-16 h-16 bg-indigo-100'} rounded-2xl overflow-hidden flex items-center justify-center mb-3 shadow-lg`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoSrc}
+            alt={displayName ?? orgSlug ?? 'School logo'}
+            className="w-full h-full object-contain p-1.5"
+            onError={() => setImgError(true)}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className={`${heroBackground ? 'w-16 h-16 bg-white/20' : 'w-10 h-10 bg-indigo-600'} rounded-2xl flex items-center justify-center mb-3 shadow-lg`}>
+        <Zap className={`${heroBackground ? 'w-9 h-9 text-white' : 'w-5 h-5 text-white'}`} />
+      </div>
+    )
+  }
+
+  if (isSchoolSubdomain && heroBackground) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 md:bg-slate-950">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroBackground}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover object-[58%_18%] scale-110 md:scale-100 md:object-center"
+        />
+        <div className="absolute inset-0 bg-slate-950/30 md:bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-slate-950/25 md:from-indigo-950/25 md:to-slate-950/30" />
+        <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-b from-transparent via-slate-50/80 to-slate-50 md:hidden" />
+
+        <div
+          className="relative min-h-screen px-4"
+          style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <div className="max-w-lg mx-auto min-h-screen flex flex-col items-center justify-center py-8">
+            <div className="flex flex-col items-center mb-6 text-center">
+              <BrandLogo />
+              <span className="text-white font-extrabold text-2xl tracking-wide mt-2 px-4 text-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                {displayName ?? 'OutOfShift'}
+              </span>
+              <p className="mt-4 text-lg font-semibold text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+                Admin sign in
+              </p>
+            </div>
+
+            <div className="w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/60 overflow-hidden">
+              <div className="p-8">
+                <h1 className="text-xl font-bold text-slate-900 mb-6">Welcome back</h1>
+
+                {error && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="admin@yourschool.org"
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || !authReady}
+                    className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {!authReady ? 'Preparing…' : loading ? 'Signing in...' : 'Sign in'}
+                  </button>
+
+                  {resetSent ? (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm p-3 rounded-lg">
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                      Password reset link sent — check your email.
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={resetLoading || !authReady}
+                      className="w-full text-sm text-slate-400 hover:text-indigo-600 transition-colors text-center disabled:opacity-50"
+                    >
+                      {resetLoading ? 'Sending...' : 'Forgot password?'}
+                    </button>
+                  )}
+                </form>
+              </div>
+
+              <div className="px-8 pb-6">
+                <p className="text-center text-xs text-slate-400">
+                  Staff submitting an absence?{' '}
+                  <Link href="/submit" className="text-indigo-500 hover:underline">
+                    Go to the form →
+                  </Link>
+                </p>
+              </div>
+            </div>
+
+            <details className="mt-5 w-full text-left rounded-xl border border-white/60 bg-white/95 backdrop-blur-sm px-4 py-3 text-xs text-slate-600">
+              <summary className="cursor-pointer font-semibold text-slate-700 list-none flex items-center justify-between">
+                <span>Trouble signing in (Chrome freezes or &quot;rate limit&quot;)?</span>
+                <span className="text-slate-400" aria-hidden>▼</span>
+              </summary>
+              <ol className="mt-3 space-y-2 list-decimal pl-4 leading-relaxed">
+                <li>
+                  <strong className="text-slate-700">Use Microsoft Edge</strong> for this site — it often works when Chrome does not, and can stay signed in.
+                </li>
+                <li>
+                  In Chrome: close <strong>every</strong> OutOfShift tab, then open Settings → Privacy → delete browsing data → only <strong>Cookies</strong> for this site (or search for <strong>outofshift</strong> under Cookies and remove them).
+                </li>
+                <li>
+                  Wait <strong>10–15 minutes</strong> if you see a rate-limit message, then try again once.
+                </li>
+              </ol>
+            </details>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 pb-safe" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-slate-900">StaffOut</span>
+            {isSchoolSubdomain ? (
+              <div className="flex flex-col items-center">
+                <BrandLogo />
+                <span className="text-2xl font-bold text-slate-900">{displayName ?? 'OutOfShift'}</span>
+              </div>
+            ) : (
+              <>
+                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-2xl font-bold text-slate-900">OutOfShift</span>
+              </>
+            )}
           </Link>
           <p className="text-slate-500 mt-2 text-sm">
             {isPlatformAdminHost ? (
               'Platform admin sign in'
-            ) : isSchoolSubdomain && orgName ? (
-              <>Admin sign in · <span className="font-medium text-slate-700">{orgName}</span></>
+            ) : isSchoolSubdomain && displayName ? (
+              <>Admin sign in · <span className="font-medium text-slate-700">{displayName}</span></>
             ) : (
               'Admin sign in'
             )}

@@ -7,6 +7,7 @@ import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
 import { formatPtoHours } from '@/lib/pto'
+import { SCHOOL_FULL_NAMES, SCHOOL_HERO_BACKGROUNDS, SCHOOL_LOGOS, getSchoolDisplayName } from '@/lib/school-branding'
 
 type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
 
@@ -37,27 +38,9 @@ interface OrgInfo {
   slug?: string
 }
 
-// Maps org slug → public logo file in /public folder
-const ORG_LOGOS: Record<string, string> = {
-  hba: '/hba.png',
-  spa: '/SPA.png',
-  wva: '/WVA.jfif',
-}
-
-const ORG_HERO_BACKGROUNDS: Record<string, string> = {
-  hba: '/Beast_1-scaled.jpg',
-}
-
-// Full school names — overrides whatever short name is stored in the database
-const ORG_FULL_NAMES: Record<string, string> = {
-  hba: 'Harvest Best Academy',
-  spa: 'Sankofa Prep',
-  wva: 'Wakanda Virtual Academy',
-}
-
 function SchoolLogo({ orgSlug, orgName }: { orgSlug: string | null; orgName: string | null }) {
   const [imgError, setImgError] = useState(false)
-  const logoSrc = orgSlug ? ORG_LOGOS[orgSlug] : null
+  const logoSrc = orgSlug ? SCHOOL_LOGOS[orgSlug] : null
 
   if (logoSrc && !imgError) {
     return (
@@ -73,7 +56,7 @@ function SchoolLogo({ orgSlug, orgName }: { orgSlug: string | null; orgName: str
     )
   }
 
-  if (orgSlug && ORG_FULL_NAMES[orgSlug]) {
+  if (orgSlug && SCHOOL_FULL_NAMES[orgSlug]) {
     // Initials fallback
     const initials = orgSlug.toUpperCase()
     return (
@@ -100,10 +83,11 @@ export default function SubmitPage() {
 
 function SubmitForm() {
   const searchParams = useSearchParams()
-  const [step, setStep] = useState<Step>('email')
+  const prefilledEmail = searchParams.get('email') ?? ''
+  const [step, setStep] = useState<Step>(() => (prefilledEmail ? 'code' : 'email'))
 
   // Step 1 — email
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefilledEmail)
   const [sendingCode, setSendingCode] = useState(false)
   const [sendError, setSendError] = useState('')
 
@@ -111,15 +95,6 @@ function SubmitForm() {
   const [orgSlug] = useState<string | null>(() =>
     typeof window !== 'undefined' ? getClientOrgSlug() : null
   )
-
-  // If arriving from homepage with email already sent, skip to code step
-  useEffect(() => {
-    const prefilledEmail = searchParams.get('email')
-    if (prefilledEmail) {
-      setEmail(prefilledEmail)
-      setStep('code')
-    }
-  }, [searchParams])
 
   // Step 2 — OTP
   const [code, setCode] = useState('')
@@ -167,7 +142,7 @@ function SubmitForm() {
   const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
 
   const isAfter8AM = new Date().getHours() >= 8
-  const heroBackground = orgSlug ? ORG_HERO_BACKGROUNDS[orgSlug] : null
+  const heroBackground = orgSlug ? SCHOOL_HERO_BACKGROUNDS[orgSlug] : null
   const useFullscreenHero = (step === 'email' || step === 'code' || step === 'form') && !!heroBackground
 
   async function handleSendCode(e: React.FormEvent) {
@@ -402,9 +377,7 @@ function SubmitForm() {
             <div className="flex flex-col items-center mb-6 text-center">
               <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
               <span className="text-white font-extrabold text-2xl tracking-wide mt-2 px-4 text-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
-                {orgSlug && ORG_FULL_NAMES[orgSlug]
-                  ? ORG_FULL_NAMES[orgSlug]
-                  : 'OutOfShift'}
+                {getSchoolDisplayName(orgSlug, org?.name ?? null) ?? 'OutOfShift'}
               </span>
               <h1 className="mt-4 text-2xl font-bold text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
                 Report your absence
@@ -507,7 +480,7 @@ function SubmitForm() {
                 </div>
                 <div className="px-6 pb-4 bg-slate-50/80 border-t border-slate-100">
                   <p className="text-xs text-slate-400 text-center pt-3">
-                    Code expires in 10 minutes · Check your spam folder if you don't see it
+                    Code expires in 10 minutes · Check your spam folder if you don&apos;t see it
                   </p>
                 </div>
               </form>
@@ -540,9 +513,7 @@ function SubmitForm() {
             <div className="flex flex-col items-center mb-6 text-center">
               <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
               <span className="text-white font-extrabold text-2xl tracking-wide mt-2 px-4 text-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
-                {orgSlug && ORG_FULL_NAMES[orgSlug]
-                  ? ORG_FULL_NAMES[orgSlug]
-                  : 'OutOfShift'}
+                {getSchoolDisplayName(orgSlug, org?.name ?? null) ?? 'OutOfShift'}
               </span>
               <h1 className="mt-4 text-2xl font-bold text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
                 Report your absence
@@ -813,9 +784,7 @@ function SubmitForm() {
           <div className="flex flex-col items-center mb-5">
             <SchoolLogo orgSlug={orgSlug} orgName={org?.name ?? null} />
             <span className="text-white font-extrabold text-xl tracking-wide mt-1 px-4 text-center">
-              {orgSlug && ORG_FULL_NAMES[orgSlug]
-                ? ORG_FULL_NAMES[orgSlug]
-                : 'OutOfShift'}
+              {getSchoolDisplayName(orgSlug, org?.name ?? null) ?? 'OutOfShift'}
             </span>
           </div>
           {/* Step context */}
@@ -925,7 +894,7 @@ function SubmitForm() {
             </div>
             <div className="px-6 pb-4 bg-slate-50 border-t border-slate-100">
               <p className="text-xs text-slate-400 text-center pt-3">
-                Code expires in 10 minutes · Check your spam folder if you don't see it
+                Code expires in 10 minutes · Check your spam folder if you don&apos;t see it
               </p>
             </div>
           </form>
