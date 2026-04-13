@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
     const redirectTo = `https://${org.slug}.${rootDomain}/auth/reset-password`
 
     const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo })
-    if (error) return apiError(error.message || 'Failed to send reset link', 500)
+    if (error) {
+      const errorMessage = error.message || 'Failed to send reset link'
+      if (errorMessage.toLowerCase().includes('rate limit')) {
+        return apiError('Too many reset emails were sent. Please wait a few minutes and try again.', 429)
+      }
+      return apiError(errorMessage, 500)
+    }
 
     return apiOk({ success: true, email, redirect_to: redirectTo })
   } catch (err) {

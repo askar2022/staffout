@@ -52,6 +52,16 @@ const statusIcon = {
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
 
+function getFriendlyPlatformAdminError(message: string) {
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('rate limit')) {
+    return 'Too many reset emails were sent. Please wait a few minutes and try again.'
+  }
+
+  return message
+}
+
 export default function PlatformAdminDashboard() {
   const [orgs, setOrgs] = useState<Org[]>([])
   const [loading, setLoading] = useState(true)
@@ -152,7 +162,7 @@ export default function PlatformAdminDashboard() {
       body: JSON.stringify({ org_id: orgId, email }),
     })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to send reset link')
+    if (!res.ok) throw new Error(getFriendlyPlatformAdminError(data.error || 'Failed to send reset link'))
   }
 
   const pending = orgs.filter((o) => o.status === 'pending')
