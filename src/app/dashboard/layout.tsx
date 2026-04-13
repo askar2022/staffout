@@ -16,7 +16,6 @@ export default async function DashboardLayout({
   if (!user) redirect('/login')
 
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-  const platformAdminUrl = `https://admin.${rootDomain}`
   const isPlatformAdmin = user.email === process.env.SUPER_ADMIN_EMAIL
   const cookieStore = await cookies()
   const headersList = await headers()
@@ -62,10 +61,6 @@ export default async function DashboardLayout({
           {children}
         </div>
       )
-    }
-
-    if (isPlatformAdmin && !isPlatformAdminHost) {
-      redirect(`${platformAdminUrl}/dashboard`)
     }
 
     if (!profile?.organization_id) redirect('/setup')
