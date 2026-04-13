@@ -13,8 +13,7 @@ async function requireSuperAdmin() {
 }
 
 // POST — invite a school admin by email
-// Sends a Supabase invite that lands on the school subdomain callback,
-// then goes to password setup before finishing school setup.
+// Sends a Supabase invite that lands directly on the school password setup page.
 export async function POST(request: NextRequest) {
   try {
     await requireSuperAdmin()
@@ -40,7 +39,8 @@ export async function POST(request: NextRequest) {
     if (!org.slug) return apiError('Set a subdomain slug for this school before inviting admins', 400)
 
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-    const redirectTo = `https://${org.slug}.${rootDomain}/auth/callback?next=/auth/reset-password`
+    const loginUrl = `https://${org.slug}.${rootDomain}/login`
+    const redirectTo = `https://${org.slug}.${rootDomain}/auth/reset-password?next=/setup`
 
     // Send Supabase invite — creates the auth user and emails a magic setup link
     const { error: inviteError } = await db.auth.admin.inviteUserByEmail(email, {
@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (inviteError) {
-      // If user already exists, they can just navigate to /setup on their subdomain
+      // If user already exists, invite won't work — use the normal school login or a reset link instead.
       if (inviteError.message?.includes('already been registered')) {
-        return apiError('This email already has an account. Ask them to go to ' + redirectTo, 409)
+        return apiError(`This email already has an account. Ask them to sign in at ${loginUrl} or use Send reset link.`, 409)
       }
       return apiError(inviteError.message || 'Failed to send invite', 500)
     }

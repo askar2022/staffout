@@ -1,18 +1,29 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Zap, Lock, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
+  )
+}
+
+function ResetPasswordForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const nextPath = searchParams.get('next') || '/dashboard'
+  const isInviteSetup = nextPath === '/setup'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -33,7 +44,7 @@ export default function ResetPasswordPage() {
       setError(updateError.message)
     } else {
       setDone(true)
-      setTimeout(() => router.push('/dashboard'), 2500)
+      setTimeout(() => router.push(nextPath), 2500)
     }
   }
 
@@ -47,7 +58,9 @@ export default function ResetPasswordPage() {
             </div>
             <span className="text-2xl font-bold text-slate-900">OutOfShift</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Set a new password</p>
+          <p className="text-slate-500 mt-2 text-sm">
+            {isInviteSetup ? 'Create your password to finish setup' : 'Set a new password'}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
@@ -57,11 +70,18 @@ export default function ResetPasswordPage() {
                 <CheckCircle className="w-7 h-7 text-green-600" />
               </div>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Password updated!</h2>
-              <p className="text-slate-500 text-sm">Redirecting you to your dashboard...</p>
+              <p className="text-slate-500 text-sm">
+                Redirecting you to {isInviteSetup ? 'setup' : 'your dashboard'}...
+              </p>
             </div>
           ) : (
             <>
-              <h1 className="text-xl font-bold text-slate-900 mb-6">Choose a new password</h1>
+              <h1 className="text-xl font-bold text-slate-900 mb-2">Choose a new password</h1>
+              <p className="text-sm text-slate-500 mb-6">
+                {isInviteSetup
+                  ? 'Set your password first, then we will finish linking you to this school.'
+                  : 'Choose a secure password for your account.'}
+              </p>
 
               {error && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
