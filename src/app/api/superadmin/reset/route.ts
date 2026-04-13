@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-    const redirectTo = `https://admin.${rootDomain}/auth/callback?next=/auth/reset-password`
+    const redirectTo = `https://${org.slug}.${rootDomain}/auth/reset-password`
 
     const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo })
     if (error) return apiError(error.message || 'Failed to send reset link', 500)
