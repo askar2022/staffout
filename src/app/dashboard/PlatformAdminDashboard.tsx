@@ -433,11 +433,11 @@ function OrgCard({
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School admins</p>
-                <p className="text-xs text-slate-400">{org.admins.length} listed</p>
+                <p className="text-xs text-slate-400">{org.admins.length === 0 ? 'No admins yet' : `${org.admins.length} listed`}</p>
               </div>
 
               {org.admins.length === 0 ? (
-                <p className="text-sm text-slate-500">No school admins listed yet. Use Add admin to send a setup link.</p>
+                <p className="text-sm text-slate-500">No school admins yet. Click Add admin to send a setup link.</p>
               ) : (
                 <div className="space-y-2">
                   {org.admins.map((admin) => (
