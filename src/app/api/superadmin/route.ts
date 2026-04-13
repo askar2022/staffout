@@ -28,7 +28,38 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) return apiError('Failed to load organizations', 500)
-    return apiOk({ organizations: data ?? [] })
+
+    const orgs = data ?? []
+    const orgIds = orgs.map((org) => org.id)
+
+    const { data: recipients, error: recipientsError } = orgIds.length
+      ? await db
+        .from('notification_recipients')
+        .select('id, organization_id, name, email, type')
+        .in('organization_id', orgIds)
+        .eq('type', 'admin')
+        .order('created_at')
+      : { data: [], error: null }
+
+    if (recipientsError) return apiError('Failed to load school admins', 500)
+
+    const adminsByOrg = new Map<string, Array<{ id: string; name: string; email: string }>>()
+    for (const recipient of recipients ?? []) {
+      const list = adminsByOrg.get(recipient.organization_id) ?? []
+      list.push({
+        id: recipient.id,
+        name: recipient.name,
+        email: recipient.email,
+      })
+      adminsByOrg.set(recipient.organization_id, list)
+    }
+
+    return apiOk({
+      organizations: orgs.map((org) => ({
+        ...org,
+        admins: adminsByOrg.get(org.id) ?? [],
+      })),
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error'
     return apiError(msg, msg === 'Forbidden' ? 403 : 401)

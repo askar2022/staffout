@@ -17,6 +17,7 @@ import {
   Plus,
   Send,
   LogOut,
+  KeyRound,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
@@ -28,6 +29,13 @@ interface Org {
   contact_email: string
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
+  admins: AdminRecord[]
+}
+
+interface AdminRecord {
+  id: string
+  name: string
+  email: string
 }
 
 const statusStyle = {
@@ -137,6 +145,16 @@ export default function PlatformAdminDashboard() {
     }
   }
 
+  async function handleReset(orgId: string, email: string) {
+    const res = await fetch('/api/superadmin/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ org_id: orgId, email }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to send reset link')
+  }
+
   const pending = orgs.filter((o) => o.status === 'pending')
   const others = orgs.filter((o) => o.status !== 'pending')
 
@@ -231,6 +249,7 @@ export default function PlatformAdminDashboard() {
                   onManage={() => handleManage(org)}
                   onSlugUpdate={(slug) => handleSlugUpdate(org.id, slug)}
                   onInvite={(email) => handleInvite(org.id, email)}
+                  onSendReset={(email) => handleReset(org.id, email)}
                   actionLoading={actionLoading}
                   rootDomain={ROOT_DOMAIN}
                 />
@@ -254,6 +273,7 @@ export default function PlatformAdminDashboard() {
                   onManage={() => handleManage(org)}
                   onSlugUpdate={(slug) => handleSlugUpdate(org.id, slug)}
                   onInvite={(email) => handleInvite(org.id, email)}
+                  onSendReset={(email) => handleReset(org.id, email)}
                   actionLoading={actionLoading}
                   rootDomain={ROOT_DOMAIN}
                 />
@@ -280,6 +300,7 @@ function OrgCard({
   onManage,
   onSlugUpdate,
   onInvite,
+  onSendReset,
   actionLoading,
   rootDomain,
 }: {
@@ -289,6 +310,7 @@ function OrgCard({
   onManage: () => void
   onSlugUpdate: (slug: string) => void
   onInvite: (email: string) => Promise<void>
+  onSendReset: (email: string) => Promise<void>
   actionLoading: string | null
   rootDomain: string
 }) {
@@ -301,6 +323,8 @@ function OrgCard({
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteSending, setInviteSending] = useState(false)
   const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [resetSendingEmail, setResetSendingEmail] = useState<string | null>(null)
+  const [resetResult, setResetResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   async function saveSlug() {
     const clean = slugInput.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
@@ -328,6 +352,19 @@ function OrgCard({
       setInviteResult({ ok: false, msg: err instanceof Error ? err.message : 'Failed to send' })
     } finally {
       setInviteSending(false)
+    }
+  }
+
+  async function sendReset(email: string) {
+    setResetSendingEmail(email)
+    setResetResult(null)
+    try {
+      await onSendReset(email)
+      setResetResult({ ok: true, msg: `Reset link sent to ${email}` })
+    } catch (err) {
+      setResetResult({ ok: false, msg: err instanceof Error ? err.message : 'Failed to send reset link' })
+    } finally {
+      setResetSendingEmail(null)
     }
   }
 
@@ -391,6 +428,44 @@ function OrgCard({
               </div>
             )}
           </div>
+
+          {org.status === 'approved' && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School admins</p>
+                <p className="text-xs text-slate-400">{org.admins.length} listed</p>
+              </div>
+
+              {org.admins.length === 0 ? (
+                <p className="text-sm text-slate-500">No school admins listed yet. Use Add admin to send a setup link.</p>
+              ) : (
+                <div className="space-y-2">
+                  {org.admins.map((admin) => (
+                    <div key={admin.id} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{admin.name || 'School admin'}</p>
+                        <p className="text-xs text-slate-500 truncate">{admin.email}</p>
+                      </div>
+                      <button
+                        onClick={() => sendReset(admin.email)}
+                        disabled={resetSendingEmail === admin.email}
+                        className="inline-flex items-center gap-1.5 border border-slate-300 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 disabled:opacity-60 shrink-0"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        {resetSendingEmail === admin.email ? 'Sending...' : 'Send reset link'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {resetResult && (
+                <p className={`text-xs mt-3 ${resetResult.ok ? 'text-green-600' : 'text-red-600'}`}>
+                  {resetResult.msg}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
@@ -422,7 +497,7 @@ function OrgCard({
                 className="flex items-center gap-1.5 bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
-                Invite admin
+                Add admin
               </button>
               <button
                 onClick={onManage}
@@ -456,7 +531,7 @@ function OrgCard({
       {showInvite && org.status === 'approved' && (
         <div className="mt-4 pt-4 border-t border-slate-100">
           <p className="text-xs text-slate-500 mb-3">
-            Send a setup link to the school admin. They will click it, confirm their name, and get access to <span className="font-mono text-indigo-600">{subdomain}</span>.
+            Send a setup link to a school admin. They will click it, confirm their name, and create their password for <span className="font-mono text-indigo-600">{subdomain}</span>.
           </p>
           <form onSubmit={sendInvite} className="flex items-center gap-2">
             <input
