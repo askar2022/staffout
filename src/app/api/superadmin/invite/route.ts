@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const db = createAdminClient()
+    const cleanEmail = email.trim().toLowerCase()
 
     // Load the org to get its slug
     const { data: org } = await db
@@ -42,8 +43,25 @@ export async function POST(request: NextRequest) {
     const loginUrl = `https://${org.slug}.${rootDomain}/login`
     const redirectTo = `https://${org.slug}.${rootDomain}/auth/reset-password?next=/setup`
 
+    // Preflight: if the auth user already exists, steer the owner toward reset/sign-in
+    const { data: usersPage, error: listUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    if (listUsersError) {
+      console.error('Invite admin preflight failed', {
+        email: cleanEmail,
+        org_id,
+        org_slug: org.slug,
+        error: listUsersError,
+      })
+      return apiError(`Could not verify existing users before inviting: ${listUsersError.message}`, 500)
+    }
+
+    const existingUser = usersPage.users.find((user) => user.email?.toLowerCase() === cleanEmail)
+    if (existingUser) {
+      return apiError(`This email already has an account. Ask them to sign in at ${loginUrl} or use Send reset link.`, 409)
+    }
+
     // Send Supabase invite — creates the auth user and emails a magic setup link
-    const { error: inviteError } = await db.auth.admin.inviteUserByEmail(email, {
+    const { error: inviteError } = await db.auth.admin.inviteUserByEmail(cleanEmail, {
       redirectTo,
       data: {
         invited_org_id: org.id,
@@ -52,15 +70,31 @@ export async function POST(request: NextRequest) {
     })
 
     if (inviteError) {
-      // If user already exists, invite won't work — use the normal school login or a reset link instead.
+      console.error('Invite school admin failed', {
+        email: cleanEmail,
+        org_id,
+        org_slug: org.slug,
+        redirectTo,
+        error: inviteError,
+      })
+
       if (inviteError.message?.includes('already been registered')) {
         return apiError(`This email already has an account. Ask them to sign in at ${loginUrl} or use Send reset link.`, 409)
       }
-      return apiError(inviteError.message || 'Failed to send invite', 500)
+
+      if (inviteError.message?.toLowerCase().includes('database error saving new user')) {
+        return apiError(
+          `Supabase could not create the invited auth user for ${cleanEmail}. This usually means there is still a Supabase Auth-side issue, not an HBA school setup issue. Check Authentication > Auth Hooks and any custom invite email template settings.`,
+          500,
+        )
+      }
+
+      return apiError(`Invite failed for ${cleanEmail}: ${inviteError.message || 'Unknown Supabase error'}`, 500)
     }
 
-    return apiOk({ success: true, redirect_to: redirectTo })
+    return apiOk({ success: true, redirect_to: redirectTo, email: cleanEmail })
   } catch (err) {
+    console.error('Invite school admin route crashed', err)
     const msg = err instanceof Error ? err.message : 'Error'
     return apiError(msg, msg === 'Forbidden' ? 403 : 401)
   }
