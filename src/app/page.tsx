@@ -2,18 +2,46 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Zap, Bell, Users, BarChart3, Shield, Clock, ArrowRight, CheckCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function HomePage() {
   const headersList = await headers()
   const orgSlug = headersList.get('x-org-slug')
+  const isPlatformAdminHost = headersList.get('x-platform-admin-host') === '1'
 
   // On a school subdomain, go straight to the submit form
   if (orgSlug) {
     redirect('/submit')
   }
 
-  // Root domain — marketing page
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+  const platformAdminUrl = `https://admin.${rootDomain}`
+
+  if (isPlatformAdminHost) {
+    redirect('/login')
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user?.email === process.env.SUPER_ADMIN_EMAIL) {
+    redirect(`${platformAdminUrl}/dashboard`)
+  }
+
+  if (user) {
+    const db = createAdminClient()
+    const { data: profile } = await db
+      .from('profiles')
+      .select('organizations(slug)')
+      .eq('id', user.id)
+      .single()
+
+    const org = profile?.organizations as unknown as { slug: string } | null
+    if (org?.slug) {
+      redirect(`https://${org.slug}.${rootDomain}/dashboard`)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -28,10 +56,10 @@ export default async function HomePage() {
             <span className="text-lg font-bold text-slate-900">StaffOut</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors hidden sm:block">
+            <Link href={platformAdminUrl} className="text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors hidden sm:block">
               Sign in
             </Link>
-            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors sm:hidden">
+            <Link href={platformAdminUrl} className="text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors sm:hidden">
               Sign in
             </Link>
             <a
@@ -211,7 +239,7 @@ export default async function HomePage() {
             <span className="font-bold text-slate-900">StaffOut</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-400">
-            <Link href="/login" className="hover:text-slate-600 transition-colors">Admin Sign In</Link>
+            <Link href={platformAdminUrl} className="hover:text-slate-600 transition-colors">Admin Sign In</Link>
             <a href="mailto:support@outofshift.com" className="hover:text-slate-600 transition-colors">Contact</a>
             <a href="mailto:support@outofshift.com" className="hover:text-slate-600 transition-colors">Support</a>
           </div>

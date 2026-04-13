@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+const PLATFORM_ADMIN_SUBDOMAIN = 'admin'
 
 /**
  * Extract the subdomain from the request host.
@@ -31,11 +32,14 @@ function getSubdomain(hostname: string): string | null {
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const subdomain = getSubdomain(hostname)
+  const isPlatformAdminHost = subdomain === PLATFORM_ADMIN_SUBDOMAIN
+  const schoolSubdomain = isPlatformAdminHost ? null : subdomain
 
   // Inject org slug into request headers for server components and route handlers
   const requestHeaders = new Headers(request.headers)
-  if (subdomain) {
-    requestHeaders.set('x-org-slug', subdomain)
+  requestHeaders.set('x-platform-admin-host', isPlatformAdminHost ? '1' : '0')
+  if (schoolSubdomain) {
+    requestHeaders.set('x-org-slug', schoolSubdomain)
   } else {
     requestHeaders.delete('x-org-slug')
   }
@@ -84,18 +88,47 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── Root domain (no subdomain) ─────────────────────────────────────────────
-  // Marketing page, super admin, signup live here.
-  // Protect /dashboard on root — only super admin can reach it via /superadmin.
+  // Marketing pages live on the root domain.
   if (!subdomain) {
     if (pathname.startsWith('/dashboard') && !user) {
       const url = request.nextUrl.clone()
+      url.hostname = `${PLATFORM_ADMIN_SUBDOMAIN}.${ROOT_DOMAIN}`
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
     return response
   }
 
-  // ── Subdomain (school or demo) ─────────────────────────────────────────────
+  // ── Platform admin subdomain ───────────────────────────────────────────────
+  if (isPlatformAdminHost) {
+    if (pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = user ? '/dashboard' : '/login'
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/dashboard') && !user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    if ((pathname === '/login' || pathname === '/signup') && user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname === '/submit') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    return response
+  }
+
+  // ── School or demo subdomain ───────────────────────────────────────────────
 
   // Protect dashboard routes
   if (pathname.startsWith('/dashboard') && !user) {

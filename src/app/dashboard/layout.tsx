@@ -15,15 +15,20 @@ export default async function DashboardLayout({
 
   if (!user) redirect('/login')
 
-  const isSuperAdmin = user.email === process.env.SUPER_ADMIN_EMAIL
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+  const platformAdminUrl = `https://admin.${rootDomain}`
+  const isPlatformAdmin = user.email === process.env.SUPER_ADMIN_EMAIL
   const cookieStore = await cookies()
-  const impersonateOrgId = isSuperAdmin
+  const headersList = await headers()
+  const currentSlug = headersList.get('x-org-slug')
+  const isPlatformAdminHost = headersList.get('x-platform-admin-host') === '1'
+  const isRootDomain = !currentSlug && !isPlatformAdminHost
+  const impersonateOrgId = isPlatformAdmin
     ? cookieStore.get('sa_impersonate_org')?.value ?? null
     : null
 
   const db = createAdminClient()
 
-  let orgId: string
   let orgName: string
   let orgSlug: string
   let orgStatus: string
@@ -35,18 +40,33 @@ export default async function DashboardLayout({
       .eq('id', impersonateOrgId)
       .single()
 
-    if (!org) redirect('/superadmin')
+    if (!org) redirect('/dashboard')
 
-    orgId = org.id
     orgName = org.name
     orgSlug = org.slug
     orgStatus = org.status
+
+    if (currentSlug !== orgSlug) {
+      redirect(`https://${orgSlug}.${rootDomain}/dashboard`)
+    }
   } else {
     const { data: profile } = await db
       .from('profiles')
       .select('organization_id, organizations(name, slug, status)')
       .eq('id', user.id)
       .single()
+
+    if (isPlatformAdmin && isPlatformAdminHost) {
+      return (
+        <div className="min-h-screen bg-slate-50">
+          {children}
+        </div>
+      )
+    }
+
+    if (isPlatformAdmin && !isPlatformAdminHost) {
+      redirect(`${platformAdminUrl}/dashboard`)
+    }
 
     if (!profile?.organization_id) redirect('/setup')
 
@@ -55,25 +75,20 @@ export default async function DashboardLayout({
     if (org?.status === 'pending') redirect('/pending')
     if (org?.status === 'rejected') redirect('/rejected')
 
-    orgId = profile.organization_id
     orgName = org?.name ?? 'My School'
     orgSlug = org?.slug ?? ''
     orgStatus = org?.status ?? 'approved'
+
+    if ((isRootDomain || isPlatformAdminHost) && orgSlug) {
+      redirect(`https://${orgSlug}.${rootDomain}/dashboard`)
+    }
   }
 
   if (orgStatus === 'pending') redirect('/pending')
   if (orgStatus === 'rejected') redirect('/rejected')
 
-  // Validate the user is on the correct subdomain.
-  // If they're on hba.outofshift.com but they belong to spa, redirect them.
-  if (!isSuperAdmin && orgSlug) {
-    const headersList = await headers()
-    const currentSlug = headersList.get('x-org-slug')
-
-    if (currentSlug && currentSlug !== orgSlug) {
-      const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
-      redirect(`https://${orgSlug}.${rootDomain}/dashboard`)
-    }
+  if (orgSlug && currentSlug !== orgSlug) {
+    redirect(`https://${orgSlug}.${rootDomain}/dashboard`)
   }
 
   return (
@@ -81,7 +96,7 @@ export default async function DashboardLayout({
       <DashboardSidebar orgName={orgName} userEmail={user.email ?? ''} />
       <main className="flex-1 overflow-y-auto dashboard-main">
         {impersonateOrgId && (
-          <SchoolSwitcherBanner orgName={orgName} orgId={orgId} />
+          <SchoolSwitcherBanner orgName={orgName} />
         )}
         {children}
       </main>

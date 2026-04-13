@@ -1,6 +1,9 @@
 import Script from 'next/script'
-import { getOrgBySlug, getOrgSlugFromRequest } from '@/lib/get-org'
+import { redirect } from 'next/navigation'
+import { getIsPlatformAdminHostFromRequest, getOrgBySlug, getOrgSlugFromRequest } from '@/lib/get-org'
 import LoginForm from './LoginForm'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /** Runs before React / Supabase client — stops refresh-token 429 storms from stale sb-* cookies */
 const CLEAR_STALE_SUPABASE_AUTH = `
@@ -35,6 +38,33 @@ const CLEAR_STALE_SUPABASE_AUTH = `
 
 export default async function LoginPage() {
   const orgSlug = await getOrgSlugFromRequest()
+  const isPlatformAdminHost = await getIsPlatformAdminHostFromRequest()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+  const platformAdminUrl = `https://admin.${rootDomain}`
+
+  if (!orgSlug && !isPlatformAdminHost) {
+    redirect(platformAdminUrl)
+  }
+
+  if (user?.email === process.env.SUPER_ADMIN_EMAIL && isPlatformAdminHost) {
+    redirect('/dashboard')
+  }
+
+  if (user && isPlatformAdminHost) {
+    const db = createAdminClient()
+    const { data: profile } = await db
+      .from('profiles')
+      .select('organizations(slug)')
+      .eq('id', user.id)
+      .single()
+
+    const org = profile?.organizations as unknown as { slug: string } | null
+    if (org?.slug) {
+      redirect(`https://${org.slug}.${rootDomain}/dashboard`)
+    }
+  }
 
   let orgName: string | null = null
   if (orgSlug) {
@@ -47,7 +77,7 @@ export default async function LoginPage() {
       <Script id="clear-stale-supabase-auth" strategy="beforeInteractive">
         {CLEAR_STALE_SUPABASE_AUTH}
       </Script>
-      <LoginForm orgName={orgName} orgSlug={orgSlug} />
+      <LoginForm orgName={orgName} orgSlug={orgSlug} isPlatformAdminHost={isPlatformAdminHost} />
     </>
   )
 }

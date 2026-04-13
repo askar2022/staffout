@@ -4,12 +4,28 @@ import Link from 'next/link'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import type { Submission } from '@/lib/types'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/get-org-id'
+import { getIsPlatformAdminHostFromRequest, getOrgSlugFromRequest } from '@/lib/get-org'
+import PlatformAdminDashboard from './PlatformAdminDashboard'
 
 export default async function DashboardPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const currentSlug = await getOrgSlugFromRequest()
+  const isPlatformAdminHost = await getIsPlatformAdminHostFromRequest()
+  const isPlatformAdmin = user?.email === process.env.SUPER_ADMIN_EMAIL
+
+  if (isPlatformAdmin && isPlatformAdminHost && !currentSlug) {
+    return <PlatformAdminDashboard />
+  }
+
   const orgId = await getOrgId()
   const db = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
+  const weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - 7)
+  const weekStartDate = weekStart.toISOString().split('T')[0]
 
   const [{ data: todaySubmissions }, { data: staffMembers }, { data: recentLogs }, { data: weekSubmissions }] =
     await Promise.all([
@@ -17,7 +33,7 @@ export default async function DashboardPage() {
       db.from('staff_members').select('id').eq('organization_id', orgId).eq('is_active', true),
       db.from('email_logs').select('*').eq('organization_id', orgId).order('sent_at', { ascending: false }).limit(5),
       db.from('submissions').select('*').eq('organization_id', orgId)
-        .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .gte('date', weekStartDate)
         .order('submitted_at', { ascending: false }),
     ])
 
@@ -45,7 +61,7 @@ export default async function DashboardPage() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-slate-500" />
-              Today's submissions
+              Today&apos;s submissions
             </h2>
             <Link href="/dashboard/submissions" className="text-xs text-indigo-600 hover:underline font-medium">View all</Link>
           </div>

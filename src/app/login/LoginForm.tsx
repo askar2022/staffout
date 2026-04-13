@@ -9,9 +9,10 @@ import { Zap, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react'
 interface Props {
   orgName: string | null
   orgSlug: string | null
+  isPlatformAdminHost: boolean
 }
 
-export default function LoginForm({ orgName, orgSlug }: Props) {
+export default function LoginForm({ orgName, orgSlug, isPlatformAdminHost }: Props) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,9 +70,9 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
       return
     }
 
-    // If on root domain, hard redirect to superadmin so cookies are fully sent
+    // If on root domain, hard redirect to the platform dashboard so cookies are fully sent
     if (!orgSlug) {
-      window.location.href = '/superadmin'
+      window.location.href = '/dashboard'
       return
     }
 
@@ -96,7 +97,7 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
     setResetLoading(false)
   }
 
-  const isSubdomain = !!orgSlug
+  const isSchoolSubdomain = !!orgSlug
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 pb-safe" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -109,7 +110,9 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
             <span className="text-2xl font-bold text-slate-900">StaffOut</span>
           </Link>
           <p className="text-slate-500 mt-2 text-sm">
-            {isSubdomain && orgName ? (
+            {isPlatformAdminHost ? (
+              'Platform admin sign in'
+            ) : isSchoolSubdomain && orgName ? (
               <>Admin sign in · <span className="font-medium text-slate-700">{orgName}</span></>
             ) : (
               'Admin sign in'
@@ -137,7 +140,7 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@yourschool.org"
+                  placeholder={isPlatformAdminHost ? 'owner@outofshift.com' : 'admin@yourschool.org'}
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -203,12 +206,14 @@ export default function LoginForm({ orgName, orgSlug }: Props) {
           </ol>
         </details>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Staff submitting an absence?{' '}
-          <Link href="/submit" className="text-indigo-500 hover:underline">
-            Go to the form →
-          </Link>
-        </p>
+        {!isPlatformAdminHost && (
+          <p className="text-center text-xs text-slate-400 mt-6">
+            Staff submitting an absence?{' '}
+            <Link href="/submit" className="text-indigo-500 hover:underline">
+              Go to the form →
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   )

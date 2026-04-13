@@ -28,3 +28,8 @@ export async function getOrgSlugFromRequest(): Promise<string | null> {
   const headersList = await headers()
   return headersList.get('x-org-slug')
 }
+
+export async function getIsPlatformAdminHostFromRequest(): Promise<boolean> {
+  const headersList = await headers()
+  return headersList.get('x-platform-admin-host') === '1'
+}
