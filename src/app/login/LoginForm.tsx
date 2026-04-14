@@ -57,12 +57,17 @@ export default function LoginForm({ orgName, orgSlug, isPlatformAdminHost }: Pro
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     if (!authReady || loginInFlight.current || loading) return
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
+      setError('Enter your email address.')
+      return
+    }
     loginInFlight.current = true
     setLoading(true)
     setError('')
 
     const supabase = createClient()
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password })
 
     if (authError || !data.user) {
       setError(formatAuthError(authError?.message))
@@ -83,7 +88,8 @@ export default function LoginForm({ orgName, orgSlug, isPlatformAdminHost }: Pro
 
   async function handleForgotPassword() {
     if (!authReady) return
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
       setError('Enter your email address above first, then click Forgot password.')
       return
     }
@@ -91,7 +97,7 @@ export default function LoginForm({ orgName, orgSlug, isPlatformAdminHost }: Pro
     setError('')
     const supabase = createClient()
     const redirectTo = `${window.location.origin}/auth/reset-password`
-    await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo })
     setResetSent(true)
     setResetLoading(false)
   }
