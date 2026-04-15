@@ -183,6 +183,7 @@ function SubmitForm() {
     if (!res.ok) {
       setVerifyError(data.error || 'Invalid code. Try again.')
     } else {
+      setEmail(data.email ?? email)
       setOrg(data.org)
       if (data.staffList && data.staffList.length > 1) {
         setStaffList(data.staffList)
@@ -202,12 +203,13 @@ function SubmitForm() {
   }
 
   async function handleLessonPlanUpload(file: File) {
-    if (!org?.id) return
+    const cleanEmail = email.trim().toLowerCase()
+    if (!org?.id || !cleanEmail) return
     setUploadingPlan(true)
     setUploadError('')
     const fd = new FormData()
     fd.append('file', file)
-    fd.append('org_id', org.id)
+    fd.append('email', cleanEmail)
     const res = await fetch('/api/lesson-plan/upload', { method: 'POST', body: fd })
     const data = await res.json()
     setUploadingPlan(false)

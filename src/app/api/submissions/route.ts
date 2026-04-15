@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
+import { requireAuth, sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { calculateTimedPtoHours } from '@/lib/pto'
 import {
@@ -9,7 +9,7 @@ import {
   buildConfirmationEmail,
   buildPtoOverageEmail,
 } from '@/lib/email/templates'
-import type { Submission, NotificationRecipient } from '@/lib/types'
+import type { Submission } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
 const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
@@ -41,10 +41,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const db = createAdminClient()
+    const orgSlug = request.headers.get('x-org-slug')
 
     // Validate required fields
     const orgId = sanitize(body.organization_id, 36)
     if (!orgId) return apiError('Missing organization')
+    if (!orgSlug) return apiError('Submissions must be sent from a school subdomain.', 403)
+
+    const verifiedEmail = normalizeWorkEmail(sanitize(body.staff_email, 200))
+    if (!verifiedEmail || !isValidEmail(verifiedEmail)) {
+      return apiError('A verified staff email is required', 400)
+    }
 
     const staffName = sanitize(body.staff_name, 100)
     if (!staffName) return apiError('Staff name is required')
@@ -65,9 +72,24 @@ export async function POST(request: NextRequest) {
       .from('organizations')
       .select('id, name, reply_to_email')
       .eq('id', orgId)
+      .eq('slug', orgSlug)
+      .eq('status', 'approved')
       .single()
 
     if (!org) return apiError('Organization not found', 404)
+
+    const { data: otpRows } = await db
+      .from('otp_codes')
+      .select('id')
+      .eq('email', verifiedEmail)
+      .eq('organization_id', orgId)
+      .eq('used', true)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+
+    if (!otpRows?.length) {
+      return apiError('Please verify your email again before submitting.', 403)
+    }
 
     // If a staff ID was sent, look up their supervisor server-side
     // The client never sends supervisor emails — we retrieve them from the DB
@@ -86,6 +108,7 @@ export async function POST(request: NextRequest) {
         .select('email, position, campus, supervisor_email, supervisor_name, pto_balance')
         .eq('id', staffId)
         .eq('organization_id', orgId)
+        .ilike('email', verifiedEmail)
         .single()
 
       if (member) {
@@ -107,6 +130,8 @@ export async function POST(request: NextRequest) {
           (sum, row) => sum + (row.pto_hours_deducted ?? 0),
           0
         )
+      } else {
+        return apiError('The verified email does not match that staff record.', 403)
       }
     }
 
