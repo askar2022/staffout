@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
+import { getOtpSendRateLimitMessage } from '@/lib/public-security'
 
 function generateCode(): string {
   return randomInt(100000, 1000000).toString()
@@ -66,6 +67,11 @@ export async function POST(request: NextRequest) {
     // No org resolved yet — try to find it from the staff member's org
     if (!orgId && staffMember) {
       orgId = staffMember.organization_id
+    }
+
+    const rateLimitMessage = await getOtpSendRateLimitMessage(db, email, orgId)
+    if (rateLimitMessage) {
+      return apiError(rateLimitMessage, 429)
     }
 
     // Delete any existing unused codes for this email + org

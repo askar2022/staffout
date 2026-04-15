@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError, apiOk, isValidEmail, normalizeWorkEmail, sanitize } from '@/lib/auth'
+import { hasRecentVerifiedOtp, LESSON_PLAN_BUCKET } from '@/lib/public-security'
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = [
@@ -41,16 +42,8 @@ export async function POST(request: NextRequest) {
 
     if (!org) return apiError('School not found or inactive.', 404)
 
-    const { data: otpRows } = await db
-      .from('otp_codes')
-      .select('id')
-      .eq('email', email)
-      .eq('organization_id', org.id)
-      .eq('used', true)
-      .gt('expires_at', new Date().toISOString())
-      .limit(1)
-
-    if (!otpRows?.length) {
+    const hasVerifiedOtp = await hasRecentVerifiedOtp(db, email, org.id)
+    if (!hasVerifiedOtp) {
       return apiError('Please verify your email again before uploading a lesson plan.', 403)
     }
 
@@ -58,7 +51,7 @@ export async function POST(request: NextRequest) {
     const path = `${org.id}/${crypto.randomUUID()}.${ext}`
 
     const { error } = await db.storage
-      .from('lesson-plans')
+      .from(LESSON_PLAN_BUCKET)
       .upload(path, await file.arrayBuffer(), {
         contentType: file.type,
         upsert: false,
@@ -66,11 +59,7 @@ export async function POST(request: NextRequest) {
 
     if (error) return apiError('Upload failed: ' + error.message, 500)
 
-    const { data: { publicUrl } } = db.storage
-      .from('lesson-plans')
-      .getPublicUrl(path)
-
-    return apiOk({ url: publicUrl })
+    return apiOk({ path })
   } catch {
     return apiError('Server error', 500)
   }

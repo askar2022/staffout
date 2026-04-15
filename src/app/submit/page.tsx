@@ -145,6 +145,12 @@ function SubmitForm() {
   const heroBackground = orgSlug ? SCHOOL_HERO_BACKGROUNDS[orgSlug] : null
   const useFullscreenHero = (step === 'email' || step === 'code' || step === 'form') && !!heroBackground
 
+  function buildPtoUrl(staffId: string, orgId: string) {
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) return null
+    return `/api/pto?staff_id=${staffId}&org_id=${orgId}&email=${encodeURIComponent(cleanEmail)}`
+  }
+
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
     setSendingCode(true)
@@ -191,8 +197,9 @@ function SubmitForm() {
       } else {
         const staff = data.staff ?? (data.staffList?.[0] ?? null)
         setVerifiedStaff(staff)
-        if (staff?.id && data.org?.id) {
-          fetch(`/api/pto?staff_id=${staff.id}&org_id=${data.org.id}`)
+        const ptoUrl = staff?.id && data.org?.id ? buildPtoUrl(staff.id, data.org.id) : null
+        if (ptoUrl) {
+          fetch(ptoUrl)
             .then((r) => r.ok ? r.json() : null)
             .then((d) => { if (d) setPtoInfo(d) })
             .catch(() => {})
@@ -217,7 +224,7 @@ function SubmitForm() {
       setUploadError(data.error || 'Upload failed')
       setLessonPlanFile(null)
     } else {
-      setLessonPlanUrl(data.url)
+      setLessonPlanUrl(data.path || null)
     }
   }
 
@@ -265,9 +272,10 @@ function SubmitForm() {
       setSubmitError(data.error || 'Something went wrong. Please try again.')
     } else {
       setSubmittedPtoDeducted(data.pto_hours_deducted ?? null)
-      if (verifiedStaff?.id && org?.id) {
+      const ptoUrl = verifiedStaff?.id && org?.id ? buildPtoUrl(verifiedStaff.id, org.id) : null
+      if (ptoUrl) {
         try {
-          const ptoRes = await fetch(`/api/pto?staff_id=${verifiedStaff.id}&org_id=${org.id}`)
+          const ptoRes = await fetch(ptoUrl)
           const ptoData = await ptoRes.json()
           if (ptoRes.ok) {
             setPtoInfo(ptoData)
@@ -920,8 +928,9 @@ function SubmitForm() {
                     type="button"
                     onClick={() => {
                       setVerifiedStaff(s)
-                      if (s?.id && org?.id) {
-                        fetch(`/api/pto?staff_id=${s.id}&org_id=${org.id}`)
+                      const ptoUrl = s?.id && org?.id ? buildPtoUrl(s.id, org.id) : null
+                      if (ptoUrl) {
+                        fetch(ptoUrl)
                           .then((r) => r.ok ? r.json() : null)
                           .then((d) => { if (d) setPtoInfo(d) })
                           .catch(() => {})

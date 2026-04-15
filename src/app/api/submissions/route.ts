@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { calculateTimedPtoHours } from '@/lib/pto'
+import { getLessonPlanAccessUrl, getSubmissionRateLimitMessage, hasRecentVerifiedOtp } from '@/lib/public-security'
 import {
   buildInstantEmail,
   buildSupervisorEmail,
@@ -78,17 +79,14 @@ export async function POST(request: NextRequest) {
 
     if (!org) return apiError('Organization not found', 404)
 
-    const { data: otpRows } = await db
-      .from('otp_codes')
-      .select('id')
-      .eq('email', verifiedEmail)
-      .eq('organization_id', orgId)
-      .eq('used', true)
-      .gt('expires_at', new Date().toISOString())
-      .limit(1)
-
-    if (!otpRows?.length) {
+    const hasVerifiedOtp = await hasRecentVerifiedOtp(db, verifiedEmail, orgId)
+    if (!hasVerifiedOtp) {
       return apiError('Please verify your email again before submitting.', 403)
+    }
+
+    const rateLimitMessage = await getSubmissionRateLimitMessage(db, verifiedEmail, orgId)
+    if (rateLimitMessage) {
+      return apiError(rateLimitMessage, 429)
     }
 
     // If a staff ID was sent, look up their supervisor server-side
@@ -138,6 +136,8 @@ export async function POST(request: NextRequest) {
     // Multi-day: validate end_date
     const endDate = sanitize(body.end_date, 10) || null
     if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return apiError('Invalid end_date format')
+
+    const submitterEmail = staffEmail ?? verifiedEmail
 
     // Count weekdays between date and end_date (inclusive)
     function countWeekdays(start: string, end: string | null): number {
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         organization_id: orgId,
         staff_id: staffId || null,
         staff_name: staffName,
-        staff_email: staffEmail,
+        staff_email: submitterEmail,
         position,
         campus,
         supervisor_email: supervisorEmail,
@@ -232,11 +232,16 @@ export async function POST(request: NextRequest) {
           : null,
     } satisfies Submission
 
+    const lessonPlanAccessUrl = await getLessonPlanAccessUrl(db, sub.lesson_plan_url)
+    const emailSubmission = lessonPlanAccessUrl
+      ? { ...sub, lesson_plan_url: lessonPlanAccessUrl }
+      : sub
+
     // Always send confirmation back to the staff member who submitted
-    if (staffEmail) {
-      const { subject, html, text } = buildConfirmationEmail(org.name, sub)
+    if (submitterEmail) {
+      const { subject, html, text } = buildConfirmationEmail(org.name, emailSubmission)
       await sendEmail({
-        to: [staffEmail],
+        to: [submitterEmail],
         subject,
         html,
         text,
@@ -246,7 +251,7 @@ export async function POST(request: NextRequest) {
 
     // Supervisor always gets an instant alert — coverage cannot wait
     if (supervisorEmail) {
-      const { subject, html, text } = buildSupervisorEmail(org.name, sub)
+      const { subject, html, text } = buildSupervisorEmail(org.name, emailSubmission)
       await sendEmail({
         to: [supervisorEmail],
         subject,
@@ -275,7 +280,7 @@ export async function POST(request: NextRequest) {
       )
 
       if (hrEmails.length > 0) {
-        const { subject, html, text } = buildPtoOverageEmail(org.name, sub)
+        const { subject, html, text } = buildPtoOverageEmail(org.name, emailSubmission)
         const result = await sendEmail({
           to: hrEmails,
           subject,
@@ -307,7 +312,7 @@ export async function POST(request: NextRequest) {
       const instantEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
 
       if (instantEmails.length > 0) {
-        const { subject, html, text } = buildInstantEmail(org.name, sub)
+        const { subject, html, text } = buildInstantEmail(org.name, emailSubmission)
         const result = await sendEmail({
           to: instantEmails,
           subject,
