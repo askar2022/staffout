@@ -144,6 +144,7 @@ function SubmitForm() {
   const isAfter8AM = new Date().getHours() >= 8
   const heroBackground = orgSlug ? SCHOOL_HERO_BACKGROUNDS[orgSlug] : null
   const useFullscreenHero = (step === 'email' || step === 'code' || step === 'form') && !!heroBackground
+  const requiresLessonPlan = !!verifiedStaff?.position?.toLowerCase().includes('teacher') && status === 'absent'
 
   function buildPtoUrl(staffId: string, orgId: string) {
     const cleanEmail = email.trim().toLowerCase()
@@ -237,6 +238,10 @@ function SubmitForm() {
     }
     if (status === 'leaving_early' && !leaveTime) {
       setSubmitError('Please enter the time you are leaving.')
+      return
+    }
+    if (requiresLessonPlan && !lessonPlanUrl) {
+      setSubmitError('Lesson plan is required for teacher absences before you can submit.')
       return
     }
 
@@ -709,12 +714,12 @@ function SubmitForm() {
                 )}
 
                 {/* Lesson plan upload for teachers */}
-                {verifiedStaff?.position?.toLowerCase().includes('teacher') && status === 'absent' && (
+                {requiresLessonPlan && (
                   <div className="rounded-xl border border-slate-200 p-4">
                     <div className="flex items-center justify-between gap-3 mb-2">
                       <div>
-                        <p className="text-sm font-semibold text-slate-800">Lesson plan</p>
-                        <p className="text-xs text-slate-500">Attach a lesson plan for your supervisor if needed.</p>
+                        <p className="text-sm font-semibold text-slate-800">Lesson plan required</p>
+                        <p className="text-xs text-slate-500">Teachers must upload a lesson plan before submitting an absence.</p>
                       </div>
                       {lessonPlanUrl && (
                         <button
@@ -765,7 +770,7 @@ function SubmitForm() {
 
                 <button
                   type="submit"
-                  disabled={submitting || uploadingPlan}
+                  disabled={submitting || uploadingPlan || !status || (requiresLessonPlan && !lessonPlanUrl)}
                   className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
                   {submitting
@@ -1148,7 +1153,7 @@ function SubmitForm() {
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1">
                     <Paperclip className="w-4 h-4" />
-                    Lesson Plan <span className="text-slate-400 font-normal">(optional)</span>
+                    Lesson Plan {requiresLessonPlan ? <span className="text-red-500 font-medium">(required for absences)</span> : <span className="text-slate-400 font-normal">(optional)</span>}
                   </label>
                   {uploadError && (
                     <p className="text-xs text-red-600 mb-2">{uploadError}</p>
@@ -1186,11 +1191,17 @@ function SubmitForm() {
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0]
+                      setLessonPlanUrl(null)
+                      setUploadError('')
                       if (f) { setLessonPlanFile(f); handleLessonPlanUpload(f) }
                       e.target.value = ''
                     }}
                   />
-                  <p className="text-xs text-slate-400 mt-1">Your supervisor will receive a download link in their alert email.</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {requiresLessonPlan
+                      ? 'A lesson plan must be uploaded before you can submit this absence.'
+                      : 'Your supervisor will receive a download link in their alert email.'}
+                  </p>
                 </div>
               )}
             </div>
@@ -1198,7 +1209,7 @@ function SubmitForm() {
             <div className="px-6 pb-6">
               <button
                 type="submit"
-                disabled={submitting || !status}
+                disabled={submitting || uploadingPlan || !status || (requiresLessonPlan && !lessonPlanUrl)}
                 className="w-full bg-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 text-base"
               >
                 {submitting
