@@ -6,7 +6,7 @@ import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Pape
 import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
-import { formatPtoHours } from '@/lib/pto'
+import { calculateTimedPtoHours, formatPtoHours } from '@/lib/pto'
 import { SCHOOL_FULL_NAMES, SCHOOL_HERO_BACKGROUNDS, SCHOOL_LOGOS, getSchoolDisplayName } from '@/lib/school-branding'
 
 type Step = 'email' | 'code' | 'pick' | 'form' | 'done'
@@ -138,7 +138,7 @@ function SubmitForm() {
   const [uploadError, setUploadError] = useState('')
 
   // PTO balance
-  const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null } | null>(null)
+  const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null; settings?: Record<string, number> } | null>(null)
   const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
   const [requestedPayType, setRequestedPayType] = useState<'pto' | 'unpaid'>('pto')
   const [submittedPayType, setSubmittedPayType] = useState<'pto' | 'unpaid' | null>(null)
@@ -152,6 +152,32 @@ function SubmitForm() {
 
   const noPtoLeft = (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
   const effectiveRequestedPayType = noPtoLeft ? 'unpaid' : requestedPayType
+  const projectedPtoHours = (() => {
+    if (effectiveRequestedPayType !== 'pto' || !status) return 0
+    if (status === 'late') {
+      return calculateTimedPtoHours({ status: 'late', expectedArrival }) ?? 0
+    }
+    if (status === 'leaving_early') {
+      return calculateTimedPtoHours({ status: 'leaving_early', leaveTime }) ?? 0
+    }
+    if (status === 'absent') {
+      const hoursPerDay = Number(ptoInfo?.settings?.absent ?? 8)
+      const start = new Date(new Date().toISOString().split('T')[0] + 'T12:00:00')
+      const last = isMultiDay && endDate ? new Date(endDate + 'T12:00:00') : start
+      let count = 0
+      const cur = new Date(start)
+      while (cur <= last) {
+        const day = cur.getDay()
+        if (day !== 0 && day !== 6) count++
+        cur.setDate(cur.getDate() + 1)
+      }
+      return Math.max(1, count) * hoursPerDay
+    }
+    return 0
+  })()
+  const projectedRemaining = ptoInfo?.remaining !== null && ptoInfo?.remaining !== undefined
+    ? (ptoInfo.remaining ?? 0) - projectedPtoHours
+    : null
 
   function buildPtoUrl(staffId: string, orgId: string) {
     const cleanEmail = email.trim().toLowerCase()
@@ -325,27 +351,22 @@ function SubmitForm() {
           {ptoInfo?.balance !== null && ptoInfo !== null && (
             <div
               className={`mt-3 py-2.5 px-4 rounded-xl text-sm flex items-center gap-2 ${
-                (ptoInfo.remaining ?? 0) < 0
+                effectiveRequestedPayType === 'pto' && (projectedRemaining ?? 0) < 0
                   ? 'bg-red-50 text-red-700'
                   : 'bg-indigo-50 text-indigo-700'
               }`}
             >
               <Clock className="w-4 h-4 shrink-0" />
-              <span>
-                {(ptoInfo.remaining ?? 0) < 0 ? (
-                  <>
-                    <span className="font-semibold">
-                      Over PTO by {formatPtoHours(Math.abs(ptoInfo.remaining ?? 0))}
-                    </span>
-                    {' '}after this submission
-                  </>
-                ) : (
-                  <>
-                    <span className="font-semibold">{formatPtoHours(ptoInfo.remaining ?? 0)} PTO remaining</span>
-                    {' '}after this submission
-                  </>
+              <div className="text-left">
+                <div>
+                  <span className="font-semibold">{formatPtoHours(ptoInfo.remaining ?? 0)} PTO currently available</span>
+                </div>
+                {effectiveRequestedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
+                  <div className="text-xs mt-0.5 opacity-90">
+                    If PTO is approved for this request, you would have {formatPtoHours(projectedRemaining)} left after today.
+                  </div>
                 )}
-              </span>
+              </div>
             </div>
           )}
           {submittedApprovalStatus && (
@@ -353,6 +374,11 @@ function SubmitForm() {
               Supervisor review: <span className="font-semibold">{APPROVAL_STATUS_LABELS[submittedApprovalStatus]}</span>
               {submittedPayType && <> · Pay type: <span className="font-semibold">{PAY_TYPE_LABELS[submittedPayType]}</span></>}
             </div>
+          )}
+          {submittedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
+            <p className="mt-2 text-xs text-slate-500">
+              Estimated PTO left if approved for this request: {formatPtoHours(projectedRemaining)}
+            </p>
           )}
           {autoSwitchedToUnpaid && (
             <p className="mt-2 text-xs text-red-600">
@@ -582,6 +608,11 @@ function SubmitForm() {
                       ({formatPtoHours(ptoInfo.used)} used of {formatPtoHours(ptoInfo.balance)})
                     </span>
                   </p>
+                  {effectiveRequestedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
+                    <p className="text-xs text-slate-500">
+                      If approved today: {formatPtoHours(projectedRemaining)} remaining after {formatPtoHours(projectedPtoHours)} for this request.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1054,6 +1085,11 @@ function SubmitForm() {
                     ({formatPtoHours(ptoInfo.used)} used of {formatPtoHours(ptoInfo.balance)})
                   </span>
                 </p>
+                {effectiveRequestedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
+                  <p className="text-xs text-slate-500">
+                    If approved today: {formatPtoHours(projectedRemaining)} remaining after {formatPtoHours(projectedPtoHours)} for this request.
+                  </p>
+                )}
               </div>
             )}
 

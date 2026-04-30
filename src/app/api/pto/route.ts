@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       return apiError('Please verify your email again before checking PTO.', 403)
     }
 
-    const [{ data: member }, { data: submissions }] = await Promise.all([
+    const [{ data: member }, { data: submissions }, { data: settingsRows }] = await Promise.all([
       db
         .from('staff_members')
         .select('pto_balance')
@@ -48,6 +48,10 @@ export async function GET(request: NextRequest) {
         .eq('staff_id', staffId)
         .eq('organization_id', orgId)
         .not('pto_hours_deducted', 'is', null),
+      db
+        .from('pto_deduction_settings')
+        .select('status, hours_per_day')
+        .eq('organization_id', orgId),
     ])
 
     if (!member) return apiError('That verified email does not match this staff record.', 403)
@@ -58,7 +62,13 @@ export async function GET(request: NextRequest) {
       0
     )
 
-    return apiOk({ balance, used, remaining: balance !== null ? balance - used : null })
+    const settings = Object.fromEntries(
+      ((settingsRows as Array<{ status?: string; hours_per_day?: number }> | null) ?? [])
+        .filter((row) => typeof row.status === 'string')
+        .map((row) => [row.status as string, Number(row.hours_per_day ?? 0)])
+    )
+
+    return apiOk({ balance, used, remaining: balance !== null ? balance - used : null, settings })
   } catch {
     return apiError('Server error', 500)
   }
