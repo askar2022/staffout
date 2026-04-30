@@ -130,6 +130,119 @@ export function buildConfirmationEmail(
   return { subject, html, text }
 }
 
+export function buildSupervisorDecisionEmail(
+  orgName: string,
+  submission: Submission
+): { subject: string; html: string; text: string } {
+  const statusLabel = STATUS_LABELS[submission.status] ?? submission.status
+  const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
+  const approvalLabel = APPROVAL_STATUS_LABELS[submission.approval_status] ?? submission.approval_status
+  const payTypeLabel = submission.pay_type ? PAY_TYPE_LABELS[submission.pay_type] : null
+
+  const decisionLine =
+    submission.approval_status === 'denied'
+      ? 'Your supervisor denied this request.'
+      : submission.pay_type === 'unpaid'
+      ? 'Your supervisor approved this request as unpaid time off.'
+      : 'Your supervisor approved this request as PTO.'
+
+  const subject =
+    submission.approval_status === 'denied'
+      ? `Update on your request — ${statusLabel} denied`
+      : submission.pay_type === 'unpaid'
+      ? `Update on your request — approved as unpaid`
+      : `Update on your request — PTO approved`
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+    <div style="background:${submission.approval_status === 'denied' ? '#dc2626' : '#16a34a'};height:5px;"></div>
+
+    <div style="padding:28px 32px 20px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${submission.approval_status === 'denied' ? '#dc2626' : '#16a34a'};margin-bottom:6px;">
+        ${orgName}
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
+        Supervisor Decision
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px;">${dateStr}</div>
+    </div>
+
+    <div style="padding:0 32px 24px;">
+      <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+        Hi <strong>${submission.staff_name}</strong>, ${decisionLine}
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:10px;">Request Details</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;width:120px;">Status</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${statusLabel}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Date</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${dateStr}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Decision</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${approvalLabel}</td>
+          </tr>
+          ${payTypeLabel ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Pay Type</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${payTypeLabel}</td>
+          </tr>` : ''}
+          ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Used</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours</td>
+          </tr>` : ''}
+          ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;color:#1e40af;line-height:1.5;">
+        Please review your PTO portal for the most current balance and any related payroll updates.
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        This is an automated update from <strong style="color:#64748b;">${orgName}</strong>. Please do not reply.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const text = [
+    `Supervisor Decision — ${orgName}`,
+    ``,
+    `Hi ${submission.staff_name},`,
+    decisionLine,
+    ``,
+    `Status: ${statusLabel}`,
+    `Date: ${dateStr}`,
+    `Decision: ${approvalLabel}`,
+    payTypeLabel ? `Pay Type: ${payTypeLabel}` : '',
+    submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
+      ? `PTO Used: ${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours`
+      : '',
+    submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
+      ? `PTO Remaining: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
+      : '',
+    ``,
+    `Please review your PTO portal for the most current balance and any related payroll updates.`,
+  ].filter(Boolean).join('\n')
+
+  return { subject, html, text }
+}
+
 // ── HR Excuse Accountability Email (to the staff member) ─────────────────────
 
 export function buildHrExcuseEmail(

@@ -341,8 +341,8 @@ function SubmitForm() {
           <h2 className="text-xl font-bold text-slate-900 mb-2">Submitted successfully</h2>
           <p className="text-slate-500 text-sm leading-relaxed">
             {isAfter8AM
-              ? 'Your absence has been recorded. An instant alert has been sent to the relevant staff.'
-              : 'Your absence has been recorded and will be included in the 8:00 AM morning summary.'}
+              ? 'Your absence has been recorded. Your supervisor has been notified and will review your PTO or unpaid request.'
+              : 'Your absence has been recorded. Your supervisor will review your PTO or unpaid request.'}
           </p>
           <div className="mt-4 py-3 px-4 bg-slate-50 rounded-xl text-sm text-slate-600">
             <span className="font-medium">{verifiedStaff?.full_name ?? email}</span>
@@ -375,6 +375,9 @@ function SubmitForm() {
               {submittedPayType && <> · Pay type: <span className="font-semibold">{PAY_TYPE_LABELS[submittedPayType]}</span></>}
             </div>
           )}
+          <p className="mt-2 text-xs text-slate-500">
+            After your supervisor approves or denies this request, you will receive an email update. Please review your PTO portal for the latest balance.
+          </p>
           {submittedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
             <p className="mt-2 text-xs text-slate-500">
               Estimated PTO left if approved for this request: {formatPtoHours(projectedRemaining)}

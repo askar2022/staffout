@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveSubmissionPayType } from '@/lib/submission-pay'
+import { sendEmail } from '@/lib/email/resend'
+import { buildSupervisorDecisionEmail } from '@/lib/email/templates'
 import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, type Submission } from '@/lib/types'
 
 type Action = 'approve' | 'unpaid' | 'deny'
@@ -22,7 +24,7 @@ export default async function SupervisorActionPage({
   const db = createAdminClient()
   const { data: submission } = await db
     .from('submissions')
-    .select('*, organizations(name)')
+    .select('*, organizations(name, reply_to_email)')
     .eq('action_token', token)
     .single()
 
@@ -62,6 +64,9 @@ export default async function SupervisorActionPage({
     ptoUsedBefore = (priorRows ?? []).reduce((sum, row) => sum + (row.pto_hours_deducted ?? 0), 0)
   }
 
+  let changed = false
+  let employeeEmailNotification: Submission | null = null
+
   if (action === 'approve') {
     const resolution = resolveSubmissionPayType({
       requestedPayType: 'pto',
@@ -73,16 +78,40 @@ export default async function SupervisorActionPage({
     updatedApprovalStatus = 'approved'
     updatedPayType = resolution.payType
 
-    await db
-      .from('submissions')
-      .update({
+    if (
+      sub.approval_status !== 'approved' ||
+      sub.pay_type !== resolution.payType ||
+      (sub.pto_hours_deducted ?? null) !== (resolution.payType === 'pto' ? resolution.approvedHours : null)
+    ) {
+      changed = true
+      const updatedSubmission = {
+        ...sub,
         approval_status: 'approved',
         pay_type: resolution.payType,
         pto_hours_deducted: resolution.payType === 'pto' ? resolution.approvedHours : null,
         supervisor_action_at: new Date().toISOString(),
         supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-      })
-      .eq('id', sub.id)
+        pto_balance_total: ptoBalance,
+        pto_used_total: ptoUsedBefore + (resolution.payType === 'pto' ? (resolution.approvedHours ?? 0) : 0),
+        pto_remaining_after:
+          ptoBalance !== null
+            ? ptoBalance - ptoUsedBefore - (resolution.payType === 'pto' ? (resolution.approvedHours ?? 0) : 0)
+            : null,
+      } satisfies Submission
+
+      await db
+        .from('submissions')
+        .update({
+          approval_status: updatedSubmission.approval_status,
+          pay_type: updatedSubmission.pay_type,
+          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
+          supervisor_action_at: updatedSubmission.supervisor_action_at,
+          supervisor_action_by: updatedSubmission.supervisor_action_by,
+        })
+        .eq('id', sub.id)
+
+      employeeEmailNotification = updatedSubmission
+    }
 
     message = resolution.autoSwitchedToUnpaid
       ? 'PTO was not available, so this submission was approved as unpaid.'
@@ -91,32 +120,89 @@ export default async function SupervisorActionPage({
     updatedApprovalStatus = 'approved'
     updatedPayType = 'unpaid'
 
-    await db
-      .from('submissions')
-      .update({
+    if (sub.approval_status !== 'approved' || sub.pay_type !== 'unpaid' || sub.pto_hours_deducted !== null) {
+      changed = true
+      const updatedSubmission = {
+        ...sub,
         approval_status: 'approved',
         pay_type: 'unpaid',
         pto_hours_deducted: null,
         supervisor_action_at: new Date().toISOString(),
         supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-      })
-      .eq('id', sub.id)
+        pto_balance_total: ptoBalance,
+        pto_used_total: ptoUsedBefore,
+        pto_remaining_after:
+          ptoBalance !== null
+            ? ptoBalance - ptoUsedBefore
+            : null,
+      } satisfies Submission
+
+      await db
+        .from('submissions')
+        .update({
+          approval_status: updatedSubmission.approval_status,
+          pay_type: updatedSubmission.pay_type,
+          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
+          supervisor_action_at: updatedSubmission.supervisor_action_at,
+          supervisor_action_by: updatedSubmission.supervisor_action_by,
+        })
+        .eq('id', sub.id)
+
+      employeeEmailNotification = updatedSubmission
+    }
 
     message = 'This submission was approved as unpaid.'
   } else {
     updatedApprovalStatus = 'denied'
 
-    await db
-      .from('submissions')
-      .update({
+    if (sub.approval_status !== 'denied' || sub.pto_hours_deducted !== null) {
+      changed = true
+      const updatedSubmission = {
+        ...sub,
         approval_status: 'denied',
         pto_hours_deducted: null,
         supervisor_action_at: new Date().toISOString(),
         supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-      })
-      .eq('id', sub.id)
+        pto_balance_total: ptoBalance,
+        pto_used_total: ptoUsedBefore,
+        pto_remaining_after:
+          ptoBalance !== null
+            ? ptoBalance - ptoUsedBefore
+            : null,
+      } satisfies Submission
+
+      await db
+        .from('submissions')
+        .update({
+          approval_status: updatedSubmission.approval_status,
+          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
+          supervisor_action_at: updatedSubmission.supervisor_action_at,
+          supervisor_action_by: updatedSubmission.supervisor_action_by,
+        })
+        .eq('id', sub.id)
+
+      employeeEmailNotification = updatedSubmission
+    }
 
     message = 'This submission was denied.'
+  }
+
+  if (changed && employeeEmailNotification?.staff_email) {
+    const { subject, html, text } = buildSupervisorDecisionEmail(
+      sub.organizations?.name ?? 'StaffOut',
+      employeeEmailNotification
+    )
+    await sendEmail({
+      to: [employeeEmailNotification.staff_email],
+      subject,
+      html,
+      text,
+      replyTo: sub.organizations?.reply_to_email ?? undefined,
+    })
+  }
+
+  if (!changed) {
+    message = `${message} The employee was already notified previously.`
   }
 
   return (
