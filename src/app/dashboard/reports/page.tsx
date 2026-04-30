@@ -60,6 +60,15 @@ interface SubmissionEntry {
   hr_excused?: boolean
 }
 
+interface LogGroup {
+  key: string
+  date: string
+  staff_name: string
+  employee_id: string | null
+  entries: SubmissionEntry[]
+  latestEntry: SubmissionEntry
+}
+
 type ViewMode = 'summary' | 'log' | 'calendar'
 
 function getDefaultRange() {
@@ -116,6 +125,30 @@ function getDayIntensityClasses(count: number) {
   }
 }
 
+function summarizeGroupStatuses(entries: SubmissionEntry[]) {
+  const counts = new Map<string, number>()
+  for (const entry of entries) {
+    counts.set(entry.status, (counts.get(entry.status) ?? 0) + 1)
+  }
+
+  const orderedStatuses = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
+  const summaryLabels: Record<string, { singular: string; plural: string }> = {
+    absent: { singular: 'absence', plural: 'absences' },
+    late: { singular: 'late', plural: 'late' },
+    leaving_early: { singular: 'left early', plural: 'left early' },
+    appointment: { singular: 'appointment', plural: 'appointments' },
+    personal_day: { singular: 'personal day', plural: 'personal days' },
+  }
+  return orderedStatuses
+    .filter((status) => counts.has(status))
+    .map((status) => {
+      const count = counts.get(status) ?? 0
+      const labels = summaryLabels[status] ?? { singular: status, plural: status }
+      return `${count} ${count === 1 ? labels.singular : labels.plural}`
+    })
+    .join(', ')
+}
+
 export default function ReportsPage() {
   const CALENDAR_PREVIEW_COUNT = 3
   const defaults = getDefaultRange()
@@ -127,6 +160,7 @@ export default function ReportsPage() {
   const [entries, setEntries] = useState<SubmissionEntry[]>([])
   const [searched, setSearched] = useState(false)
   const [expandedName, setExpandedName] = useState<string | null>(null)
+  const [expandedLogGroups, setExpandedLogGroups] = useState<Record<string, boolean>>({})
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null)
   const [totalSubmissions, setTotalSubmissions] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('log')
@@ -142,6 +176,7 @@ export default function ReportsPage() {
     if (res.ok) {
       setStaff(data.staff ?? [])
       setEntries(data.entries ?? [])
+      setExpandedLogGroups({})
       setTotalSubmissions(data.totalSubmissions ?? 0)
     }
   }, [startDate, endDate, nameFilter])
@@ -163,6 +198,26 @@ export default function ReportsPage() {
     return grouped
   }, [calendarDays, entries])
   const selectedDayEntries = selectedCalendarDay ? (entriesByDay.get(selectedCalendarDay) ?? []) : []
+  const logGroups = useMemo(() => {
+    const groups = new Map<string, LogGroup>()
+    for (const entry of entries) {
+      const key = `${entry.date}::${entry.employee_id ?? entry.staff_name}`
+      const existing = groups.get(key)
+      if (existing) {
+        existing.entries.push(entry)
+      } else {
+        groups.set(key, {
+          key,
+          date: entry.date,
+          staff_name: entry.staff_name,
+          employee_id: entry.employee_id,
+          entries: [entry],
+          latestEntry: entry,
+        })
+      }
+    }
+    return Array.from(groups.values())
+  }, [entries])
 
   function exportCSV() {
     const headers = [
@@ -399,40 +454,133 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {entries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-4 text-sm text-slate-700">{formatDateLabel(entry.date)}</td>
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-semibold text-slate-900">{entry.staff_name}</p>
-                        {entry.employee_id && <p className="text-xs text-slate-400 font-mono">ID: {entry.employee_id}</p>}
-                        {entry.hr_excused && <p className="text-xs text-purple-600 mt-1">HR Excused</p>}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[entry.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                          {STATUS_LABELS[entry.status] ?? entry.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-700">
-                        {entry.pay_type ? (
-                          <>
-                            <span className="font-semibold">{PAY_TYPE_LABELS[entry.pay_type]}</span>
-                            {entry.pto_hours_requested ? <span className="text-slate-400"> · req {formatPtoHours(entry.pto_hours_requested)}</span> : null}
-                            {entry.pto_hours_deducted ? <span className="text-slate-400"> · approved {formatPtoHours(entry.pto_hours_deducted)}</span> : null}
-                          </>
-                        ) : '—'}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${APPROVAL_COLORS[entry.approval_status] ?? 'bg-slate-100 text-slate-600'}`}>
-                          {APPROVAL_STATUS_LABELS[entry.approval_status] ?? entry.approval_status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {entry.supervisor_action_at ? new Date(entry.supervisor_action_at).toLocaleString('en-US') : 'Pending'}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-600">{entry.supervisor_action_by ?? entry.supervisor_name ?? '—'}</td>
-                      <td className="px-5 py-4 text-sm text-slate-500 max-w-xs">{entry.notes || '—'}</td>
-                    </tr>
-                  ))}
+                  {logGroups.map((group) => {
+                    const entry = group.latestEntry
+                    const isExpanded = expandedLogGroups[group.key] === true
+                    const count = group.entries.length
+                    const groupSummary = summarizeGroupStatuses(group.entries)
+                    return (
+                      <Fragment key={group.key}>
+                        <tr className="hover:bg-slate-50">
+                          <td className="px-5 py-4 text-sm text-slate-700">{formatDateLabel(group.date)}</td>
+                          <td className="px-5 py-4">
+                            <div className="flex items-start gap-2">
+                              {count > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedLogGroups((current) => ({ ...current, [group.key]: !isExpanded }))}
+                                  className="mt-0.5 rounded-md border border-slate-200 p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                                  aria-label={isExpanded ? 'Collapse submissions' : 'Expand submissions'}
+                                >
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                </button>
+                              ) : (
+                                <span className="w-[22px] shrink-0" />
+                              )}
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{group.staff_name}</p>
+                                {group.employee_id && <p className="text-xs text-slate-400 font-mono">ID: {group.employee_id}</p>}
+                                {entry.hr_excused && <p className="text-xs text-purple-600 mt-1">HR Excused</p>}
+                                {count > 1 && (
+                                  <p className="text-xs text-indigo-600 mt-1 font-medium">{groupSummary}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            {count > 1 ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                                {count} entries
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[entry.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                                {STATUS_LABELS[entry.status] ?? entry.status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-700">
+                            {count > 1 ? (
+                              <span className="text-slate-500">Click `+` to view each pay entry</span>
+                            ) : entry.pay_type ? (
+                              <>
+                                <span className="font-semibold">{PAY_TYPE_LABELS[entry.pay_type]}</span>
+                                {entry.pto_hours_requested ? <span className="text-slate-400"> · req {formatPtoHours(entry.pto_hours_requested)}</span> : null}
+                                {entry.pto_hours_deducted ? <span className="text-slate-400"> · approved {formatPtoHours(entry.pto_hours_deducted)}</span> : null}
+                              </>
+                            ) : '—'}
+                          </td>
+                          <td className="px-5 py-4">
+                            {count > 1 ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                                Grouped
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${APPROVAL_COLORS[entry.approval_status] ?? 'bg-slate-100 text-slate-600'}`}>
+                                {APPROVAL_STATUS_LABELS[entry.approval_status] ?? entry.approval_status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-600">
+                            {count > 1 ? 'Multiple times' : (entry.supervisor_action_at ? new Date(entry.supervisor_action_at).toLocaleString('en-US') : 'Pending')}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-600">{entry.supervisor_action_by ?? entry.supervisor_name ?? '—'}</td>
+                          <td className="px-5 py-4 text-sm text-slate-500 max-w-xs">
+                            {count > 1 ? 'Open group to read each note' : (entry.notes || '—')}
+                          </td>
+                        </tr>
+                        {count > 1 && isExpanded && (
+                          <tr>
+                            <td colSpan={8} className="bg-slate-50 px-5 py-4 border-t border-slate-100">
+                              <div className="space-y-3">
+                                {group.entries.map((item) => (
+                                  <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="flex flex-wrap gap-2">
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[item.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                                          {STATUS_LABELS[item.status] ?? item.status}
+                                        </span>
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${APPROVAL_COLORS[item.approval_status] ?? 'bg-slate-100 text-slate-600'}`}>
+                                          {APPROVAL_STATUS_LABELS[item.approval_status] ?? item.approval_status}
+                                        </span>
+                                        {item.pay_type && (
+                                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                                            {PAY_TYPE_LABELS[item.pay_type]}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-400">
+                                        {item.supervisor_action_at ? new Date(item.supervisor_action_at).toLocaleString('en-US') : 'Pending'}
+                                      </p>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                      <div>
+                                        <p className="text-slate-400">Supervisor</p>
+                                        <p className="text-slate-700">{item.supervisor_action_by ?? item.supervisor_name ?? '—'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400">Requested PTO</p>
+                                        <p className="text-slate-700">{item.pto_hours_requested ? formatPtoHours(item.pto_hours_requested) : '—'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400">Approved PTO</p>
+                                        <p className="text-slate-700">{item.pto_hours_deducted ? formatPtoHours(item.pto_hours_deducted) : '—'}</p>
+                                      </div>
+                                    </div>
+                                    {item.notes && (
+                                      <div className="mt-3">
+                                        <p className="text-slate-400 text-sm">Notes</p>
+                                        <p className="text-sm text-slate-700 mt-1">{item.notes}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -445,7 +593,19 @@ export default function ReportsPage() {
                   const hiddenCount = Math.max(0, dayEntries.length - CALENDAR_PREVIEW_COUNT)
                   const dayTone = getDayIntensityClasses(dayEntries.length)
                   return (
-                    <div key={day} className={`border rounded-xl min-h-[180px] p-3 ${dayTone.card}`}>
+                    <div
+                      key={day}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedCalendarDay(day)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setSelectedCalendarDay(day)
+                        }
+                      }}
+                      className={`border rounded-xl min-h-[180px] p-3 transition-shadow cursor-pointer hover:shadow-md ${dayTone.card}`}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
@@ -459,7 +619,7 @@ export default function ReportsPage() {
                       </div>
                       <div className="space-y-2">
                         {dayEntries.length === 0 ? (
-                          <p className="text-xs text-slate-400">No entries</p>
+                          <p className="text-xs text-green-700">No entries. Click to view.</p>
                         ) : visibleEntries.map((entry) => (
                           <div
                             key={entry.id}
@@ -479,14 +639,10 @@ export default function ReportsPage() {
                             </p>
                           </div>
                         ))}
-                        {hiddenCount > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedCalendarDay(day)}
-                            className="w-full text-xs font-semibold text-indigo-600 bg-white border border-dashed border-indigo-200 rounded-lg py-2 hover:bg-indigo-50 transition-colors"
-                          >
-                            View all {dayEntries.length} entries
-                          </button>
+                        {dayEntries.length > 0 && (
+                          <div className="w-full text-xs font-semibold text-indigo-600 bg-white border border-dashed border-indigo-200 rounded-lg py-2 text-center">
+                            {hiddenCount > 0 ? `View all ${dayEntries.length} entries` : 'Click to view details'}
+                          </div>
                         )}
                       </div>
                     </div>
