@@ -32,7 +32,12 @@ export default async function SupervisorActionPage({
     return <ResultCard tone="error" title="This supervisor link is no longer valid." />
   }
 
-  const sub = submission as Submission & { organizations?: { name?: string } | null }
+  const sub = submission as Submission & {
+    organizations?: {
+      name?: string
+      reply_to_email?: string | null
+    } | null
+  }
   let updatedApprovalStatus = sub.approval_status
   let updatedPayType = sub.pay_type
   let message = 'No changes were needed.'
