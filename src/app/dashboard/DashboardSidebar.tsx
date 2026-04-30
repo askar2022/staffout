@@ -36,7 +36,7 @@ export default function DashboardSidebar({ orgName, userEmail }: { orgName: stri
         <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
           <Zap className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="font-bold text-slate-900">StaffOut</span>
+        <span className="font-bold text-slate-900">OutOfShift</span>
       </div>
       <p className="text-xs text-slate-500 truncate mt-1 pl-9">{orgName}</p>
     </div>
@@ -100,7 +100,7 @@ export default function DashboardSidebar({ orgName, userEmail }: { orgName: stri
           <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
             <Zap className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="font-bold text-slate-900">StaffOut</span>
+          <span className="font-bold text-slate-900">OutOfShift</span>
           <span className="text-xs text-slate-400 truncate max-w-[140px]">· {orgName}</span>
         </div>
         <button

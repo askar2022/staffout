@@ -1,4 +1,4 @@
-import { Submission, STATUS_LABELS } from '@/lib/types'
+import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, Submission, STATUS_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 import { formatPtoHours } from '@/lib/pto'
 
@@ -60,6 +60,14 @@ export function buildConfirmationEmail(
             <td style="font-size:13px;color:#64748b;padding:4px 0;">Reason</td>
             <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td>
           </tr>` : ''}
+          ${submission.pay_type ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Pay Type</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${PAY_TYPE_LABELS[submission.pay_type]}</td>
+          </tr>` : ''}
+          ${submission.approval_status ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;">Supervisor Review</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${APPROVAL_STATUS_LABELS[submission.approval_status]}</td>
+          </tr>` : ''}
           ${submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined ? `<tr>
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Deducted</td>
             <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours</td>
@@ -102,6 +110,8 @@ export function buildConfirmationEmail(
     `Status: ${statusLabel}`,
     throughStr ? `Through: ${throughStr}` : '',
     submission.reason_category ? `Reason: ${submission.reason_category}` : '',
+    submission.pay_type ? `Pay Type: ${PAY_TYPE_LABELS[submission.pay_type]}` : '',
+    submission.approval_status ? `Supervisor Review: ${APPROVAL_STATUS_LABELS[submission.approval_status]}` : '',
     submission.pto_hours_deducted !== null && submission.pto_hours_deducted !== undefined
       ? `PTO Deducted: ${formatPtoHours(submission.pto_hours_deducted, { suffix: false })} hours`
       : '',
@@ -588,7 +598,12 @@ export function buildInstantEmail(
 
 export function buildSupervisorEmail(
   orgName: string,
-  submission: Submission
+  submission: Submission,
+  actionUrls?: {
+    approveUrl: string
+    unpaidUrl: string
+    denyUrl: string
+  }
 ): { subject: string; html: string; text: string } {
   const statusLabel = STATUS_LABELS[submission.status]
   const needsCoverage = submission.status === 'absent' || submission.status === 'personal_day'
@@ -658,10 +673,22 @@ export function buildSupervisorEmail(
         ${submission.campus ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Campus</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.campus}</td></tr>` : ''}
         ${timeDetail ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Time</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${timeDetail}</td></tr>` : ''}
         ${submission.reason_category ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Reason</td><td style="padding:8px 0;color:#111827;font-size:14px;">${submission.reason_category.charAt(0).toUpperCase() + submission.reason_category.slice(1)}</td></tr>` : ''}
-        ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">PTO Remaining</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours</td></tr>` : ''}
+        ${submission.pay_type ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Suggested Pay Type</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${PAY_TYPE_LABELS[submission.pay_type]}</td></tr>` : ''}
+        ${submission.pto_hours_requested !== null && submission.pto_hours_requested !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Requested PTO Hours</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formatPtoHours(submission.pto_hours_requested, { suffix: false })} hours</td></tr>` : ''}
+        ${submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">PTO Available</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours after approval</td></tr>` : ''}
         ${submission.notes ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Notes</td><td style="padding:8px 0;color:#374151;font-size:14px;font-style:italic;">"${submission.notes}"</td></tr>` : ''}
         ${submission.end_date ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Through</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:500;">${submission.end_date}</td></tr>` : ''}
       </table>
+      ${actionUrls ? `
+        <div style="margin-top:20px;">
+          <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#334155;">Supervisor action</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a href="${actionUrls.approveUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;font-size:14px;font-weight:700;padding:10px 16px;border-radius:8px;text-decoration:none;">Approve PTO</a>
+            <a href="${actionUrls.unpaidUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:14px;font-weight:700;padding:10px 16px;border-radius:8px;text-decoration:none;">Mark Unpaid</a>
+            <a href="${actionUrls.denyUrl}" style="display:inline-block;background:#dc2626;color:#ffffff;font-size:14px;font-weight:700;padding:10px 16px;border-radius:8px;text-decoration:none;">Deny</a>
+          </div>
+        </div>
+      ` : ''}
       ${submission.lesson_plan_url ? `
         <div style="margin-top:20px;padding:16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;">
           <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#3730a3;">📎 Lesson Plan Attached</p>
@@ -690,10 +717,17 @@ export function buildSupervisorEmail(
     submission.campus ? `Campus: ${submission.campus}` : '',
     timeDetail ? `Time: ${timeDetail}` : '',
     submission.reason_category ? `Reason: ${submission.reason_category}` : '',
+    submission.pay_type ? `Suggested Pay Type: ${PAY_TYPE_LABELS[submission.pay_type]}` : '',
+    submission.pto_hours_requested !== null && submission.pto_hours_requested !== undefined
+      ? `Requested PTO Hours: ${formatPtoHours(submission.pto_hours_requested, { suffix: false })} hours`
+      : '',
     submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
-      ? `PTO Remaining: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
+      ? `PTO Available After Approval: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
       : '',
     submission.notes ? `Notes: "${submission.notes}"` : '',
+    actionUrls ? `Approve PTO: ${actionUrls.approveUrl}` : '',
+    actionUrls ? `Mark Unpaid: ${actionUrls.unpaidUrl}` : '',
+    actionUrls ? `Deny: ${actionUrls.denyUrl}` : '',
   ]
     .filter(Boolean)
     .join('\n')

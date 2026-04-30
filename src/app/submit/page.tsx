@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Paperclip, X, CalendarRange } from 'lucide-react'
-import { REASON_LABELS, STATUS_LABELS } from '@/lib/types'
+import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
 import { formatPtoHours } from '@/lib/pto'
@@ -140,11 +140,18 @@ function SubmitForm() {
   // PTO balance
   const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null } | null>(null)
   const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
+  const [requestedPayType, setRequestedPayType] = useState<'pto' | 'unpaid'>('pto')
+  const [submittedPayType, setSubmittedPayType] = useState<'pto' | 'unpaid' | null>(null)
+  const [submittedApprovalStatus, setSubmittedApprovalStatus] = useState<'pending' | 'approved' | 'denied' | null>(null)
+  const [autoSwitchedToUnpaid, setAutoSwitchedToUnpaid] = useState(false)
 
   const isAfter8AM = new Date().getHours() >= 8
   const heroBackground = orgSlug ? SCHOOL_HERO_BACKGROUNDS[orgSlug] : null
   const useFullscreenHero = (step === 'email' || step === 'code' || step === 'form') && !!heroBackground
   const requiresLessonPlan = !!verifiedStaff?.position?.toLowerCase().includes('teacher') && status === 'absent'
+
+  const noPtoLeft = (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
+  const effectiveRequestedPayType = noPtoLeft ? 'unpaid' : requestedPayType
 
   function buildPtoUrl(staffId: string, orgId: string) {
     const cleanEmail = email.trim().toLowerCase()
@@ -265,6 +272,7 @@ function SubmitForm() {
         expected_arrival: status === 'late' ? expectedArrival : null,
         leave_time: status === 'leaving_early' ? leaveTime : null,
         reason_category: reasonCategory || null,
+        requested_pay_type: effectiveRequestedPayType,
         notes: notes || null,
         lesson_plan_url: lessonPlanUrl || null,
       }),
@@ -277,6 +285,9 @@ function SubmitForm() {
       setSubmitError(data.error || 'Something went wrong. Please try again.')
     } else {
       setSubmittedPtoDeducted(data.pto_hours_deducted ?? null)
+      setSubmittedPayType(data.pay_type ?? null)
+      setSubmittedApprovalStatus(data.approval_status ?? null)
+      setAutoSwitchedToUnpaid(data.auto_switched_to_unpaid === true)
       const ptoUrl = verifiedStaff?.id && org?.id ? buildPtoUrl(verifiedStaff.id, org.id) : null
       if (ptoUrl) {
         try {
@@ -337,6 +348,17 @@ function SubmitForm() {
               </span>
             </div>
           )}
+          {submittedApprovalStatus && (
+            <div className="mt-3 py-2.5 px-4 rounded-xl text-sm bg-amber-50 text-amber-700">
+              Supervisor review: <span className="font-semibold">{APPROVAL_STATUS_LABELS[submittedApprovalStatus]}</span>
+              {submittedPayType && <> · Pay type: <span className="font-semibold">{PAY_TYPE_LABELS[submittedPayType]}</span></>}
+            </div>
+          )}
+          {autoSwitchedToUnpaid && (
+            <p className="mt-2 text-xs text-red-600">
+              No PTO was available for this request, so it was automatically submitted as unpaid.
+            </p>
+          )}
           {submittedPtoDeducted !== null && submittedPtoDeducted > 0 && (
             <p className="mt-2 text-xs text-slate-500">
               PTO deducted for this submission: {formatPtoHours(submittedPtoDeducted)}
@@ -360,6 +382,10 @@ function SubmitForm() {
               setLessonPlanUrl(null)
               setPtoInfo(null)
               setSubmittedPtoDeducted(null)
+              setRequestedPayType('pto')
+              setSubmittedPayType(null)
+              setSubmittedApprovalStatus(null)
+              setAutoSwitchedToUnpaid(false)
             }}
             className="mt-5 text-sm text-indigo-600 font-medium hover:underline"
           >
@@ -643,6 +669,51 @@ function SubmitForm() {
                     <p className="mt-1 text-xs text-slate-400">PTO will be deducted from the time you select until 4:00 PM.</p>
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Use for this request</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {(['pto', 'unpaid'] as const).map((value) => {
+                      const noPtoLeft = value === 'pto' && (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
+                      return (
+                        <label
+                          key={value}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all ${
+                            effectiveRequestedPayType === value
+                              ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
+                              : 'border-slate-200 bg-white'
+                          } ${noPtoLeft ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="requested_pay_type"
+                            value={value}
+                            checked={effectiveRequestedPayType === value}
+                            disabled={noPtoLeft}
+                            onChange={() => setRequestedPayType(value)}
+                            className="hidden"
+                          />
+                          <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                            effectiveRequestedPayType === value ? 'border-current bg-current' : 'border-slate-300'
+                          }`}>
+                            {effectiveRequestedPayType === value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold">{PAY_TYPE_LABELS[value]}</div>
+                            <div className="text-xs opacity-80">
+                              {value === 'pto'
+                                ? 'Use available PTO if enough hours remain.'
+                                : 'Send this request as unpaid time.'}
+                            </div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {(ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0 && (
+                    <p className="mt-2 text-xs text-red-600">No PTO is available, so this request must be unpaid.</p>
+                  )}
+                </div>
 
                 {/* Reason */}
                 <div>
@@ -1070,6 +1141,51 @@ function SubmitForm() {
                   <p className="mt-1 text-xs text-slate-400">PTO will be deducted from the time you select until 4:00 PM.</p>
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Use for this request</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {(['pto', 'unpaid'] as const).map((value) => {
+                    const noPtoLeft = value === 'pto' && (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
+                    return (
+                      <label
+                        key={value}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all ${
+                          effectiveRequestedPayType === value
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
+                            : 'border-slate-200 bg-white'
+                        } ${noPtoLeft ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="requested_pay_type"
+                          value={value}
+                          checked={effectiveRequestedPayType === value}
+                          disabled={noPtoLeft}
+                          onChange={() => setRequestedPayType(value)}
+                          className="hidden"
+                        />
+                        <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                          effectiveRequestedPayType === value ? 'border-current bg-current' : 'border-slate-300'
+                        }`}>
+                          {effectiveRequestedPayType === value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold">{PAY_TYPE_LABELS[value]}</div>
+                          <div className="text-xs opacity-70">
+                            {value === 'pto'
+                              ? 'Use available PTO if enough hours remain.'
+                              : 'Send this request as unpaid time.'}
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                {(ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0 && (
+                  <p className="mt-2 text-xs text-red-600">No PTO is available, so this request must be unpaid.</p>
+                )}
+              </div>
 
               {/* Reason */}
               <div>

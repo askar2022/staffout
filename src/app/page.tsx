@@ -53,7 +53,7 @@ export default async function HomePage() {
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-bold text-slate-900">StaffOut</span>
+            <span className="text-lg font-bold text-slate-900">OutOfShift</span>
           </div>
           <div className="flex items-center gap-3">
             <Link href={platformAdminUrl} className="text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors hidden sm:block">
@@ -236,7 +236,7 @@ export default async function HomePage() {
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-slate-900">StaffOut</span>
+            <span className="font-bold text-slate-900">OutOfShift</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-400">
             <Link href={platformAdminUrl} className="hover:text-slate-600 transition-colors">Admin Sign In</Link>

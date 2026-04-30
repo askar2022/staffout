@@ -14,6 +14,10 @@ export type ReasonCategory =
 
 export type EmailType = 'summary' | 'instant' | 'supervisor'
 
+export type SubmissionPayType = 'pto' | 'unpaid'
+
+export type SubmissionApprovalStatus = 'pending' | 'approved' | 'denied'
+
 export interface Organization {
   id: string
   name: string
@@ -67,10 +71,18 @@ export interface Submission {
   leave_time: string | null
   reason_category: ReasonCategory | null
   notes: string | null
+  pay_type: SubmissionPayType | null
+  requested_pay_type?: SubmissionPayType | null
+  approval_status: SubmissionApprovalStatus
+  pto_hours_requested?: number | null
   pto_hours_deducted: number | null
   pto_remaining_after?: number | null
   pto_balance_total?: number | null
   pto_used_total?: number | null
+  supervisor_action_at?: string | null
+  supervisor_action_by?: string | null
+  supervisor_note?: string | null
+  action_token?: string | null
   lesson_plan_url: string | null
   hr_excused: boolean
   hr_note: string | null
@@ -130,4 +142,15 @@ export const REASON_LABELS: Record<ReasonCategory, string> = {
   family: 'Family Matter',
   medical: 'Medical Appointment',
   other: 'Other',
+}
+
+export const PAY_TYPE_LABELS: Record<SubmissionPayType, string> = {
+  pto: 'PTO',
+  unpaid: 'Unpaid',
+}
+
+export const APPROVAL_STATUS_LABELS: Record<SubmissionApprovalStatus, string> = {
+  pending: 'Pending',
+  approved: 'Approved',
+  denied: 'Denied',
 }

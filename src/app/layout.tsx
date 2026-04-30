@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'StaffOut — Staff Attendance Alerts',
+  title: 'OutOfShift — Staff Attendance Alerts',
   description: 'Automated staff absence notifications for schools and organizations.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'StaffOut',
+    title: 'OutOfShift',
   },
 }
 

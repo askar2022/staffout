@@ -1,19 +1,21 @@
 import { NextRequest } from 'next/server'
+import crypto from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { calculateTimedPtoHours } from '@/lib/pto'
 import { getLessonPlanAccessUrl, getSubmissionRateLimitMessage, hasRecentVerifiedOtp } from '@/lib/public-security'
+import { resolveSubmissionPayType } from '@/lib/submission-pay'
 import {
   buildInstantEmail,
   buildSupervisorEmail,
   buildConfirmationEmail,
-  buildPtoOverageEmail,
 } from '@/lib/email/templates'
 import type { Submission } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
 const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
+const ALLOWED_PAY_TYPES = ['pto', 'unpaid']
 const SCHOOL_START_HOUR = 8      // 8:00 AM CT
 const SCHOOL_END_HOUR  = 15      // 3:00 PM CT
 const SCHOOL_END_MINUTE = 30     // 3:30 PM CT
@@ -65,6 +67,8 @@ export async function POST(request: NextRequest) {
 
     const reasonCategory = sanitize(body.reason_category, 50)
     if (reasonCategory && !ALLOWED_REASONS.includes(reasonCategory)) return apiError('Invalid reason')
+    const requestedPayType = sanitize(body.requested_pay_type, 20) || 'pto'
+    if (!ALLOWED_PAY_TYPES.includes(requestedPayType)) return apiError('Invalid pay type')
     const expectedArrival = sanitize(body.expected_arrival, 10) || null
     const leaveTime = sanitize(body.leave_time, 10) || null
 
@@ -155,21 +159,21 @@ export async function POST(request: NextRequest) {
 
     const numDays = countWeekdays(date, endDate)
 
-    // Auto-calculate PTO hours to deduct
-    let ptoHoursDeducted: number | null = null
+    // Calculate requested PTO hours. Actual deduction happens only after supervisor action.
+    let ptoHoursRequested: number | null = null
     if (staffId) {
       if (status === 'late') {
         if (!expectedArrival) return apiError('Expected arrival time is required')
 
         const timedHours = calculateTimedPtoHours({ status: 'late', expectedArrival })
         if (timedHours === null) return apiError('Invalid expected arrival time')
-        ptoHoursDeducted = timedHours
+        ptoHoursRequested = timedHours
       } else if (status === 'leaving_early') {
         if (!leaveTime) return apiError('Leave time is required')
 
         const timedHours = calculateTimedPtoHours({ status: 'leaving_early', leaveTime })
         if (timedHours === null) return apiError('Invalid leave time')
-        ptoHoursDeducted = timedHours
+        ptoHoursRequested = timedHours
       } else {
         const { data: ptoSetting } = await db
           .from('pto_deduction_settings')
@@ -180,10 +184,18 @@ export async function POST(request: NextRequest) {
 
         const hoursPerDay = ptoSetting?.hours_per_day ?? 0
         if (hoursPerDay > 0) {
-          ptoHoursDeducted = hoursPerDay * numDays
+          ptoHoursRequested = hoursPerDay * numDays
         }
       }
     }
+
+    const payResolution = resolveSubmissionPayType({
+      requestedPayType: requestedPayType as 'pto' | 'unpaid',
+      requestedHours: ptoHoursRequested,
+      balance: ptoBalance,
+      used: ptoUsedBefore,
+    })
+    const actionToken = supervisorEmail ? crypto.randomUUID() : null
 
     // Lesson plan URL (already uploaded by client)
     const lessonPlanUrl = sanitize(body.lesson_plan_url, 500) || null
@@ -209,7 +221,12 @@ export async function POST(request: NextRequest) {
         leave_time: leaveTime,
         reason_category: reasonCategory || null,
         notes: sanitize(body.notes, 500) || null,
-        pto_hours_deducted: ptoHoursDeducted,
+        requested_pay_type: requestedPayType,
+        pay_type: payResolution.payType,
+        approval_status: 'pending',
+        pto_hours_requested: ptoHoursRequested,
+        pto_hours_deducted: null,
+        action_token: actionToken,
         lesson_plan_url: lessonPlanUrl,
         instant_sent: false,
         summary_included: false,
@@ -225,11 +242,8 @@ export async function POST(request: NextRequest) {
     const sub = {
       ...(submission as Submission),
       pto_balance_total: ptoBalance,
-      pto_used_total: ptoUsedBefore + (ptoHoursDeducted ?? 0),
-      pto_remaining_after:
-        ptoBalance !== null
-          ? ptoBalance - ptoUsedBefore - (ptoHoursDeducted ?? 0)
-          : null,
+      pto_used_total: ptoUsedBefore,
+      pto_remaining_after: payResolution.remainingAfter,
     } satisfies Submission
 
     const lessonPlanAccessUrl = await getLessonPlanAccessUrl(db, sub.lesson_plan_url)
@@ -251,7 +265,13 @@ export async function POST(request: NextRequest) {
 
     // Supervisor always gets an instant alert — coverage cannot wait
     if (supervisorEmail) {
-      const { subject, html, text } = buildSupervisorEmail(org.name, emailSubmission)
+      const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+      const baseUrl = `https://${orgSlug}.${rootDomain}/supervisor-action?token=${encodeURIComponent(actionToken ?? '')}`
+      const { subject, html, text } = buildSupervisorEmail(org.name, emailSubmission, {
+        approveUrl: `${baseUrl}&action=approve`,
+        unpaidUrl: `${baseUrl}&action=unpaid`,
+        denyUrl: `${baseUrl}&action=deny`,
+      })
       await sendEmail({
         to: [supervisorEmail],
         subject,
@@ -266,39 +286,6 @@ export async function POST(request: NextRequest) {
         subject,
         submission_id: submission.id,
       })
-    }
-
-    if ((sub.pto_remaining_after ?? 0) < 0) {
-      const { data: hrRecipientsRaw } = await db
-        .from('notification_recipients')
-        .select('email')
-        .eq('organization_id', orgId)
-        .eq('type', 'hr')
-
-      const hrEmails = Array.from(
-        new Set((hrRecipientsRaw ?? []).map((recipient: { email: string }) => recipient.email))
-      )
-
-      if (hrEmails.length > 0) {
-        const { subject, html, text } = buildPtoOverageEmail(org.name, emailSubmission)
-        const result = await sendEmail({
-          to: hrEmails,
-          subject,
-          html,
-          text,
-          replyTo: org.reply_to_email ?? undefined,
-        })
-
-        await db.from('email_logs').insert({
-          organization_id: orgId,
-          type: 'instant',
-          recipients: hrEmails,
-          subject,
-          submission_id: submission.id,
-          success: result.success,
-          error_message: result.success ? null : result.error,
-        })
-      }
     }
 
     // All-staff instant alert only during school hours (8 AM – 3:30 PM CT)
@@ -339,7 +326,10 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         id: submission.id,
-        pto_hours_deducted: ptoHoursDeducted,
+        pto_hours_deducted: null,
+        pay_type: payResolution.payType,
+        approval_status: 'pending',
+        auto_switched_to_unpaid: payResolution.autoSwitchedToUnpaid,
       },
       201
     )

@@ -1,15 +1,16 @@
 import { NextRequest } from 'next/server'
+import crypto from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, apiError, apiOk, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { calculateTimedPtoHours } from '@/lib/pto'
+import { resolveSubmissionPayType } from '@/lib/submission-pay'
 import {
   buildInstantEmail,
   buildSupervisorEmail,
   buildHrExcuseEmail,
-  buildPtoOverageEmail,
 } from '@/lib/email/templates'
-import type { Submission, NotificationRecipient } from '@/lib/types'
+import type { Submission } from '@/lib/types'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
 const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     // Look up org
     const { data: org } = await db
       .from('organizations')
-      .select('id, name, reply_to_email')
+      .select('id, name, slug, reply_to_email')
       .eq('id', orgId)
       .single()
 
@@ -91,20 +92,20 @@ export async function POST(request: NextRequest) {
       0
     )
 
-    // Auto-calculate PTO deduction
-    let ptoHoursDeducted: number | null = null
+    // Calculate requested PTO hours. Supervisor approval decides whether PTO is used.
+    let ptoHoursRequested: number | null = null
     if (status === 'late') {
       if (!expectedArrival) return apiError('Expected arrival time is required')
 
       const timedHours = calculateTimedPtoHours({ status: 'late', expectedArrival })
       if (timedHours === null) return apiError('Invalid expected arrival time')
-      ptoHoursDeducted = timedHours
+      ptoHoursRequested = timedHours
     } else if (status === 'leaving_early') {
       if (!leaveTime) return apiError('Leave time is required')
 
       const timedHours = calculateTimedPtoHours({ status: 'leaving_early', leaveTime })
       if (timedHours === null) return apiError('Invalid leave time')
-      ptoHoursDeducted = timedHours
+      ptoHoursRequested = timedHours
     } else {
       const { data: ptoSetting } = await db
         .from('pto_deduction_settings')
@@ -115,9 +116,16 @@ export async function POST(request: NextRequest) {
 
       const hoursPerDay = ptoSetting?.hours_per_day
       if (hoursPerDay != null && hoursPerDay > 0) {
-        ptoHoursDeducted = hoursPerDay
+        ptoHoursRequested = hoursPerDay
       }
     }
+    const payResolution = resolveSubmissionPayType({
+      requestedPayType: 'unpaid',
+      requestedHours: ptoHoursRequested,
+      balance: ptoBalance,
+      used: ptoUsedBefore,
+    })
+    const actionToken = member.supervisor_email ? crypto.randomUUID() : null
 
     // Insert submission
     const { data: submission, error } = await db
@@ -137,7 +145,12 @@ export async function POST(request: NextRequest) {
         leave_time: leaveTime,
         reason_category: reasonCategory,
         notes: sanitize(body.notes, 500) || null,
-        pto_hours_deducted: ptoHoursDeducted,
+        requested_pay_type: 'unpaid',
+        pay_type: payResolution.payType,
+        approval_status: 'pending',
+        pto_hours_requested: ptoHoursRequested,
+        pto_hours_deducted: null,
+        action_token: actionToken,
         hr_excused: true,
         hr_note: hrNote,
         instant_sent: false,
@@ -154,11 +167,8 @@ export async function POST(request: NextRequest) {
     const sub = {
       ...(submission as Submission),
       pto_balance_total: ptoBalance,
-      pto_used_total: ptoUsedBefore + (ptoHoursDeducted ?? 0),
-      pto_remaining_after:
-        ptoBalance !== null
-          ? ptoBalance - ptoUsedBefore - (ptoHoursDeducted ?? 0)
-          : null,
+      pto_used_total: ptoUsedBefore,
+      pto_remaining_after: payResolution.remainingAfter,
     } satisfies Submission
 
     // 1. Accountability email to the staff member
@@ -175,7 +185,13 @@ export async function POST(request: NextRequest) {
 
     // 2. Supervisor alert (always instant)
     if (member.supervisor_email) {
-      const { subject, html, text } = buildSupervisorEmail(org.name, sub)
+      const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'outofshift.com'
+      const baseUrl = `https://${org.slug}.${rootDomain}/supervisor-action?token=${encodeURIComponent(actionToken ?? '')}`
+      const { subject, html, text } = buildSupervisorEmail(org.name, sub, {
+        approveUrl: `${baseUrl}&action=approve`,
+        unpaidUrl: `${baseUrl}&action=unpaid`,
+        denyUrl: `${baseUrl}&action=deny`,
+      })
       await sendEmail({
         to: [member.supervisor_email],
         subject,
@@ -190,39 +206,6 @@ export async function POST(request: NextRequest) {
         subject,
         submission_id: submission.id,
       })
-    }
-
-    if ((sub.pto_remaining_after ?? 0) < 0) {
-      const { data: hrRecipientsRaw } = await db
-        .from('notification_recipients')
-        .select('email')
-        .eq('organization_id', orgId)
-        .eq('type', 'hr')
-
-      const hrEmails = Array.from(
-        new Set((hrRecipientsRaw ?? []).map((recipient: { email: string }) => recipient.email))
-      )
-
-      if (hrEmails.length > 0) {
-        const { subject, html, text } = buildPtoOverageEmail(org.name, sub)
-        const result = await sendEmail({
-          to: hrEmails,
-          subject,
-          html,
-          text,
-          replyTo: org.reply_to_email ?? undefined,
-        })
-
-        await db.from('email_logs').insert({
-          organization_id: orgId,
-          type: 'instant',
-          recipients: hrEmails,
-          subject,
-          submission_id: submission.id,
-          success: result.success,
-          error_message: result.success ? null : result.error,
-        })
-      }
     }
 
     // 3. All-staff alert — instant if during school hours, otherwise morning summary
@@ -258,7 +241,12 @@ export async function POST(request: NextRequest) {
       await db.from('submissions').update({ instant_sent: true }).eq('id', submission.id)
     }
 
-    return apiOk({ success: true, id: submission.id }, 201)
+    return apiOk({
+      success: true,
+      id: submission.id,
+      pay_type: payResolution.payType,
+      approval_status: 'pending',
+    }, 201)
   } catch (err) {
     if (err instanceof AuthError) return apiError(err.message, 401)
     return apiError('Server error', 500)

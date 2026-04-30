@@ -116,8 +116,14 @@ export async function GET(request: NextRequest) {
       entry.dates.push({ date: s.date, status: s.status, pto_hours: s.pto_hours_deducted })
     }
 
+    const entries = submissions.map((s) => ({
+      ...s,
+      employee_id: s.staff_id ? (staffInfoMap[s.staff_id]?.employee_id ?? null) : null,
+    }))
+
     return apiOk({
       staff: Object.values(byStaff).sort((a, b) => b.total - a.total),
+      entries,
       totalSubmissions: submissions.length,
     })
   } catch (err) {
