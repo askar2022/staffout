@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useMemo, useState } from 'react'
-import { BarChart2, CalendarDays, ChevronDown, ChevronUp, Clock, Download, FileText, Printer, Search } from 'lucide-react'
+import { BarChart2, CalendarDays, ChevronDown, ChevronUp, Clock, Download, FileText, Printer, Search, X } from 'lucide-react'
 import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS } from '@/lib/types'
 import { formatPtoHours } from '@/lib/pto'
 
@@ -91,7 +91,33 @@ function buildCalendarDays(startDate: string, endDate: string) {
   return days
 }
 
+function getDayIntensityClasses(count: number) {
+  if (count >= 6) {
+    return {
+      card: 'border-red-200 bg-red-50/70',
+      badge: 'bg-red-100 border-red-200 text-red-700',
+    }
+  }
+  if (count >= 3) {
+    return {
+      card: 'border-amber-200 bg-amber-50/70',
+      badge: 'bg-amber-100 border-amber-200 text-amber-700',
+    }
+  }
+  if (count >= 1) {
+    return {
+      card: 'border-blue-200 bg-blue-50/70',
+      badge: 'bg-blue-100 border-blue-200 text-blue-700',
+    }
+  }
+  return {
+    card: 'border-green-200 bg-green-50/70',
+    badge: 'bg-green-100 border-green-200 text-green-700',
+  }
+}
+
 export default function ReportsPage() {
+  const CALENDAR_PREVIEW_COUNT = 3
   const defaults = getDefaultRange()
   const [startDate, setStartDate] = useState(defaults.start)
   const [endDate, setEndDate] = useState(defaults.end)
@@ -101,6 +127,7 @@ export default function ReportsPage() {
   const [entries, setEntries] = useState<SubmissionEntry[]>([])
   const [searched, setSearched] = useState(false)
   const [expandedName, setExpandedName] = useState<string | null>(null)
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null)
   const [totalSubmissions, setTotalSubmissions] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('log')
 
@@ -135,6 +162,7 @@ export default function ReportsPage() {
     }
     return grouped
   }, [calendarDays, entries])
+  const selectedDayEntries = selectedCalendarDay ? (entriesByDay.get(selectedCalendarDay) ?? []) : []
 
   function exportCSV() {
     const headers = [
@@ -413,8 +441,11 @@ export default function ReportsPage() {
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
                 {calendarDays.map((day) => {
                   const dayEntries = entriesByDay.get(day) ?? []
+                  const visibleEntries = dayEntries.slice(0, CALENDAR_PREVIEW_COUNT)
+                  const hiddenCount = Math.max(0, dayEntries.length - CALENDAR_PREVIEW_COUNT)
+                  const dayTone = getDayIntensityClasses(dayEntries.length)
                   return (
-                    <div key={day} className="border border-slate-200 rounded-xl bg-slate-50/60 min-h-[180px] p-3">
+                    <div key={day} className={`border rounded-xl min-h-[180px] p-3 ${dayTone.card}`}>
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
@@ -422,16 +453,19 @@ export default function ReportsPage() {
                           </p>
                           <p className="text-xs text-slate-500">{formatDateLabel(day)}</p>
                         </div>
-                        <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-full px-2 py-1">
+                        <span className={`text-xs font-semibold border rounded-full px-2 py-1 ${dayTone.badge}`}>
                           {dayEntries.length}
                         </span>
                       </div>
                       <div className="space-y-2">
                         {dayEntries.length === 0 ? (
                           <p className="text-xs text-slate-400">No entries</p>
-                        ) : dayEntries.map((entry) => (
-                          <div key={entry.id} className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-sm">
-                            <p className="text-xs font-semibold text-slate-900">{entry.staff_name}</p>
+                        ) : visibleEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-sm"
+                          >
+                            <p className="text-xs font-semibold text-slate-900 truncate">{entry.staff_name}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLORS[entry.status] ?? 'bg-slate-100 text-slate-600'}`}>
                                 {STATUS_LABELS[entry.status] ?? entry.status}
@@ -440,11 +474,20 @@ export default function ReportsPage() {
                                 {APPROVAL_STATUS_LABELS[entry.approval_status] ?? entry.approval_status}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 mt-1">
+                            <p className="text-[11px] text-slate-500 mt-1 truncate">
                               {entry.pay_type ? PAY_TYPE_LABELS[entry.pay_type] : 'No pay type'}{entry.supervisor_action_by ? ` · ${entry.supervisor_action_by}` : ''}
                             </p>
                           </div>
                         ))}
+                        {hiddenCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCalendarDay(day)}
+                            className="w-full text-xs font-semibold text-indigo-600 bg-white border border-dashed border-indigo-200 rounded-lg py-2 hover:bg-indigo-50 transition-colors"
+                          >
+                            View all {dayEntries.length} entries
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -529,6 +572,88 @@ export default function ReportsPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+      {selectedCalendarDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close day details"
+            onClick={() => setSelectedCalendarDay(null)}
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+          />
+          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Calendar Day</p>
+                <h2 className="text-lg font-bold text-slate-900">{formatDateLabel(selectedCalendarDay)}</h2>
+                <p className="text-sm text-slate-500 mt-1">{selectedDayEntries.length} entr{selectedDayEntries.length === 1 ? 'y' : 'ies'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCalendarDay(null)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-[65vh] overflow-y-auto p-5 space-y-3 bg-slate-50/60">
+              {selectedDayEntries.length === 0 ? (
+                <p className="text-sm text-slate-500">No entries for this day.</p>
+              ) : selectedDayEntries.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{entry.staff_name}</p>
+                      {entry.employee_id && <p className="text-xs text-slate-400 font-mono mt-0.5">ID: {entry.employee_id}</p>}
+                    </div>
+                    {entry.hr_excused && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                        HR Excused
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[entry.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {STATUS_LABELS[entry.status] ?? entry.status}
+                    </span>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${APPROVAL_COLORS[entry.approval_status] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {APPROVAL_STATUS_LABELS[entry.approval_status] ?? entry.approval_status}
+                    </span>
+                    {entry.pay_type && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                        {PAY_TYPE_LABELS[entry.pay_type]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-400">Supervisor</p>
+                      <p className="text-slate-700">{entry.supervisor_action_by ?? entry.supervisor_name ?? 'Pending'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Action Time</p>
+                      <p className="text-slate-700">{entry.supervisor_action_at ? new Date(entry.supervisor_action_at).toLocaleString('en-US') : 'Pending'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Requested PTO</p>
+                      <p className="text-slate-700">{entry.pto_hours_requested ? formatPtoHours(entry.pto_hours_requested) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Approved PTO</p>
+                      <p className="text-slate-700">{entry.pto_hours_deducted ? formatPtoHours(entry.pto_hours_deducted) : '—'}</p>
+                    </div>
+                  </div>
+                  {entry.notes && (
+                    <div className="mt-3">
+                      <p className="text-slate-400 text-sm">Notes</p>
+                      <p className="text-sm text-slate-700 mt-1">{entry.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
