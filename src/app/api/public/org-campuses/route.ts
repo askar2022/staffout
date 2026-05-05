@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiError, apiOk } from '@/lib/auth'
-import { getActiveOrgCampuses } from '@/lib/org-campuses'
+import { getSubmitCampusOptions } from '@/lib/org-campuses'
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get('slug')
@@ -14,6 +14,6 @@ export async function GET(request: NextRequest) {
     return apiError('Organization not found', 404)
   }
 
-  const campuses = await getActiveOrgCampuses(db, org.id)
+  const campuses = await getSubmitCampusOptions(db, org.id, slug)
   return apiOk({ campuses })
 }

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { getOtpSendRateLimitMessage } from '@/lib/public-security'
-import { getActiveOrgCampuses } from '@/lib/org-campuses'
+import { getSubmitCampusOptions } from '@/lib/org-campuses'
 
 function generateCode(): string {
   return randomInt(100000, 1000000).toString()
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     let orgCampuses: string[] = []
     if (orgId && orgSlug !== 'demo') {
-      orgCampuses = await getActiveOrgCampuses(db, orgId)
+      orgCampuses = await getSubmitCampusOptions(db, orgId, orgSlug)
       if (orgCampuses.length > 1 && !campus) {
         return apiError('Please select the school or campus where you work.', 400)
       }

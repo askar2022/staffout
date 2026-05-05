@@ -22,6 +22,8 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 Keep **`staff_members.campus`** exactly aligned with how campuses appear after sync/import (same spelling and casing). The staff submit picker and notification routing both rely on those strings.
 
+For the **`hba`** umbrella tenant, submit always offers **HBA**, **SPA**, and **WVA** so a site is visible even if the roster has not tagged anyone there yet—**Sankofa Prep staff must still use campus `SPA`** on their directory row (not only the full school name) so sign-in and routing stay consistent.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

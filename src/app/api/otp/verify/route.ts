@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
-import { getActiveOrgCampuses } from '@/lib/org-campuses'
+import { getSubmitCampusOptions } from '@/lib/org-campuses'
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     let staffMembers = staffMembersRaw ?? []
 
     if (orgId && orgSlug !== 'demo') {
-      const orgCampuses = await getActiveOrgCampuses(db, orgId)
+      const orgCampuses = await getSubmitCampusOptions(db, orgId, orgSlug)
       if (orgCampuses.length > 1 && !campus) {
         return apiError('Please select the school or campus where you work.', 400)
       }
