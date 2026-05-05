@@ -99,10 +99,15 @@ function SubmitForm() {
   /** Distinct campuses for this org (directory); drives required school picker on umbrella domains. */
   const needsOrgCampusFetch = !!(orgSlug && orgSlug !== 'demo')
   const [orgCampuses, setOrgCampuses] = useState<string[]>([])
-  const [campusesFetchDone, setCampusesFetchDone] = useState(!needsOrgCampusFetch)
+  /** Pending until slug org campus list loads successfully; error blocks submit until Retry. */
+  const [campusListStatus, setCampusListStatus] = useState<'pending' | 'ok' | 'error'>(() =>
+    needsOrgCampusFetch ? 'pending' : 'ok'
+  )
+  const [campusRetryKey, setCampusRetryKey] = useState(0)
   const [selectedCampus, setSelectedCampus] = useState('')
   /** Single-campus orgs infer campus; multi-campus uses the dropdown selection. */
   const effectiveCampus = orgCampuses.length === 1 ? orgCampuses[0] : selectedCampus
+  const campusesReady = !needsOrgCampusFetch || campusListStatus === 'ok'
 
   // Step 2 — OTP
   const [code, setCode] = useState('')
@@ -128,25 +133,48 @@ function SubmitForm() {
   }, [orgSlug])
 
   useEffect(() => {
-    if (!orgSlug || orgSlug === 'demo') return
-    let cancelled = false
-    fetch(`/api/public/org-campuses?slug=${encodeURIComponent(orgSlug)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { campuses?: string[] } | null) => {
-        if (cancelled || !data?.campuses) return
-        setOrgCampuses(data.campuses)
+    if (!orgSlug || orgSlug === 'demo') {
+      queueMicrotask(() => {
+        setOrgCampuses([])
+        setCampusListStatus('ok')
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setCampusesFetchDone(true)
+      return
+    }
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setCampusListStatus('pending')
+    })
+    fetch(`/api/public/org-campuses?slug=${encodeURIComponent(orgSlug)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data: { campuses?: unknown }) => {
+        if (cancelled) return
+        const raw = data?.campuses
+        if (!Array.isArray(raw)) {
+          setOrgCampuses([])
+          setCampusListStatus('error')
+          return
+        }
+        const list = raw.filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+        setOrgCampuses(list)
+        setCampusListStatus('ok')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOrgCampuses([])
+          setCampusListStatus('error')
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [orgSlug])
+  }, [orgSlug, campusRetryKey])
 
   useEffect(() => {
-    if (!prefilledEmail || !campusesFetchDone) return
+    if (!prefilledEmail || !campusesReady) return
     queueMicrotask(() => {
       if (!orgSlug || orgSlug === 'demo') {
         setStep('code')
@@ -156,7 +184,7 @@ function SubmitForm() {
         setStep('code')
       }
     })
-  }, [prefilledEmail, campusesFetchDone, orgSlug, orgCampuses])
+  }, [prefilledEmail, campusesReady, orgSlug, orgCampuses])
   const [status, setStatus] = useState<'' | 'absent' | 'late' | 'leaving_early'>('')
   const [expectedArrival, setExpectedArrival] = useState('')
   const [leaveTime, setLeaveTime] = useState('')
@@ -229,6 +257,12 @@ function SubmitForm() {
     setSendingCode(true)
     setSendError('')
 
+    if (needsOrgCampusFetch && campusListStatus !== 'ok') {
+      setSendError('Still loading schools—wait a moment or tap Try again.')
+      setSendingCode(false)
+      return
+    }
+
     if (orgSlug && orgSlug !== 'demo' && orgCampuses.length > 1 && !effectiveCampus.trim()) {
       setSendError('Please select the school or campus where you work.')
       setSendingCode(false)
@@ -249,7 +283,7 @@ function SubmitForm() {
     setSendingCode(false)
 
     if (!res.ok) {
-      setSendError(data.error || 'Failed to send code. Try again.')
+      setSendError((typeof data.error === 'string' && data.error) || 'Failed to send code. Try again.')
     } else {
       setStep('code')
     }
@@ -519,6 +553,23 @@ function SubmitForm() {
                     We will send a 6-digit verification code to confirm your identity.
                   </p>
 
+                  {needsOrgCampusFetch && campusListStatus === 'pending' && (
+                    <p className="text-xs text-slate-500 mb-3">Loading school list…</p>
+                  )}
+
+                  {needsOrgCampusFetch && campusListStatus === 'error' && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3 rounded-lg mb-4 flex flex-col gap-2">
+                      <span>We couldn&apos;t load your schools. Check your connection, then try again.</span>
+                      <button
+                        type="button"
+                        onClick={() => setCampusRetryKey((k) => k + 1)}
+                        className="text-left text-sm font-semibold text-amber-800 underline underline-offset-2 w-fit"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+
                   {sendError && (
                     <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
                       {sendError}
@@ -546,10 +597,10 @@ function SubmitForm() {
                         required
                         value={selectedCampus}
                         onChange={(e) => setSelectedCampus(e.target.value)}
-                        disabled={!campusesFetchDone}
+                        disabled={!campusesReady}
                         className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-60"
                       >
-                        <option value="">{campusesFetchDone ? 'Select your school…' : 'Loading campuses…'}</option>
+                        <option value="">{campusesReady ? 'Select your school…' : 'Loading campuses…'}</option>
                         {orgCampuses.map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
@@ -562,7 +613,7 @@ function SubmitForm() {
                     disabled={
                       sendingCode ||
                       !email ||
-                      !campusesFetchDone ||
+                      !campusesReady ||
                       (orgSlug !== null &&
                         orgSlug !== 'demo' &&
                         orgCampuses.length > 1 &&
@@ -1019,6 +1070,23 @@ function SubmitForm() {
                 We will send a 6-digit verification code to confirm your identity.
               </p>
 
+              {needsOrgCampusFetch && campusListStatus === 'pending' && (
+                <p className="text-xs text-slate-500 mb-3">Loading school list…</p>
+              )}
+
+              {needsOrgCampusFetch && campusListStatus === 'error' && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3 rounded-lg mb-4 flex flex-col gap-2">
+                  <span>We couldn&apos;t load your schools. Check your connection, then try again.</span>
+                  <button
+                    type="button"
+                    onClick={() => setCampusRetryKey((k) => k + 1)}
+                    className="text-left text-sm font-semibold text-amber-800 underline underline-offset-2 w-fit"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
               {sendError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
                   {sendError}
@@ -1046,10 +1114,10 @@ function SubmitForm() {
                     required
                     value={selectedCampus}
                     onChange={(e) => setSelectedCampus(e.target.value)}
-                    disabled={!campusesFetchDone}
+                    disabled={!campusesReady}
                     className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                   >
-                    <option value="">{campusesFetchDone ? 'Select your school…' : 'Loading campuses…'}</option>
+                    <option value="">{campusesReady ? 'Select your school…' : 'Loading campuses…'}</option>
                     {orgCampuses.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
@@ -1062,7 +1130,7 @@ function SubmitForm() {
                 disabled={
                   sendingCode ||
                   !email ||
-                  !campusesFetchDone ||
+                  !campusesReady ||
                   (orgSlug !== null &&
                     orgSlug !== 'demo' &&
                     orgCampuses.length > 1 &&
