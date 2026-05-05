@@ -18,6 +18,8 @@ export type SubmissionPayType = 'pto' | 'unpaid'
 
 export type SubmissionApprovalStatus = 'pending' | 'approved' | 'denied'
 
+export type SubmissionDecisionActorRole = 'supervisor' | 'hr_admin'
+
 export interface Organization {
   id: string
   name: string
@@ -82,6 +84,8 @@ export interface Submission {
   supervisor_action_at?: string | null
   supervisor_action_by?: string | null
   supervisor_note?: string | null
+  decision_note?: string | null
+  decision_last_updated_by_role?: SubmissionDecisionActorRole | null
   action_token?: string | null
   lesson_plan_url: string | null
   hr_excused: boolean
@@ -118,6 +122,20 @@ export interface EmailLog {
   submission_id: string | null
   success: boolean
   error_message: string | null
+}
+
+export interface SubmissionDecisionEvent {
+  id: string
+  submission_id: string
+  organization_id: string
+  actor_name: string | null
+  actor_role: SubmissionDecisionActorRole
+  action: 'approve_pto' | 'approve_unpaid' | 'deny'
+  approval_status: SubmissionApprovalStatus
+  pay_type: SubmissionPayType | null
+  pto_hours_deducted: number | null
+  note: string | null
+  created_at: string
 }
 
 export const STATUS_LABELS: Record<SubmissionStatus, string> = {

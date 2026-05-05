@@ -138,13 +138,17 @@ export function buildSupervisorDecisionEmail(
   const dateStr = format(new Date(submission.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
   const approvalLabel = APPROVAL_STATUS_LABELS[submission.approval_status] ?? submission.approval_status
   const payTypeLabel = submission.pay_type ? PAY_TYPE_LABELS[submission.pay_type] : null
+  const decisionSource =
+    submission.decision_last_updated_by_role === 'hr_admin'
+      ? 'HR updated your request.'
+      : 'Your supervisor reviewed your request.'
 
   const decisionLine =
     submission.approval_status === 'denied'
-      ? 'Your supervisor denied this request.'
+      ? `${decisionSource} The request was denied.`
       : submission.pay_type === 'unpaid'
-      ? 'Your supervisor approved this request as unpaid time off.'
-      : 'Your supervisor approved this request as PTO.'
+      ? `${decisionSource} The request was approved as unpaid time off.`
+      : `${decisionSource} The request was approved as PTO.`
 
   const subject =
     submission.approval_status === 'denied'
@@ -166,7 +170,7 @@ export function buildSupervisorDecisionEmail(
         ${orgName}
       </div>
       <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
-        Supervisor Decision
+        ${submission.decision_last_updated_by_role === 'hr_admin' ? 'HR Decision Update' : 'Supervisor Decision'}
       </div>
       <div style="font-size:14px;color:#64748b;margin-top:4px;">${dateStr}</div>
     </div>
@@ -203,6 +207,10 @@ export function buildSupervisorDecisionEmail(
             <td style="font-size:13px;color:#64748b;padding:4px 0;">PTO Remaining</td>
             <td style="font-size:13px;font-weight:600;color:#0f172a;padding:4px 0;">${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours</td>
           </tr>` : ''}
+          ${submission.decision_note ? `<tr>
+            <td style="font-size:13px;color:#64748b;padding:4px 0;vertical-align:top;">Decision Note</td>
+            <td style="font-size:13px;color:#0f172a;padding:4px 0;">${submission.decision_note}</td>
+          </tr>` : ''}
         </table>
       </div>
 
@@ -221,7 +229,7 @@ export function buildSupervisorDecisionEmail(
 </html>`
 
   const text = [
-    `Supervisor Decision — ${orgName}`,
+    `${submission.decision_last_updated_by_role === 'hr_admin' ? 'HR Decision Update' : 'Supervisor Decision'} — ${orgName}`,
     ``,
     `Hi ${submission.staff_name},`,
     decisionLine,
@@ -236,6 +244,7 @@ export function buildSupervisorDecisionEmail(
     submission.pto_remaining_after !== null && submission.pto_remaining_after !== undefined
       ? `PTO Remaining: ${formatPtoHours(submission.pto_remaining_after, { suffix: false })} hours`
       : '',
+    submission.decision_note ? `Decision Note: ${submission.decision_note}` : '',
     ``,
     `Please review your PTO portal for the most current balance and any related payroll updates.`,
   ].filter(Boolean).join('\n')

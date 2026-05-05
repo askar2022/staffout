@@ -83,6 +83,8 @@ alter table submissions add column if not exists pto_hours_requested numeric def
 alter table submissions add column if not exists supervisor_action_at timestamptz default null;
 alter table submissions add column if not exists supervisor_action_by text default null;
 alter table submissions add column if not exists supervisor_note text default null;
+alter table submissions add column if not exists decision_note text default null;
+alter table submissions add column if not exists decision_last_updated_by_role text default null;
 alter table submissions add column if not exists action_token text default null;
 alter table submissions add column if not exists hr_excused boolean default false;
 alter table submissions add column if not exists hr_note text default null;
@@ -90,6 +92,20 @@ alter table submissions add column if not exists hr_note text default null;
 create unique index if not exists submissions_action_token_idx
   on submissions(action_token)
   where action_token is not null;
+
+create table if not exists submission_decision_events (
+  id uuid primary key default gen_random_uuid(),
+  submission_id uuid not null references submissions(id) on delete cascade,
+  organization_id uuid not null references organizations(id) on delete cascade,
+  actor_name text,
+  actor_role text not null check (actor_role in ('supervisor', 'hr_admin')),
+  action text not null check (action in ('approve_pto', 'approve_unpaid', 'deny')),
+  approval_status text not null check (approval_status in ('pending', 'approved', 'denied')),
+  pay_type text check (pay_type in ('pto', 'unpaid')),
+  pto_hours_deducted numeric default null,
+  note text,
+  created_at timestamptz default now()
+);
 
 -- PTO deduction settings per organization
 create table if not exists pto_deduction_settings (

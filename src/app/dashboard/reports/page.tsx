@@ -56,6 +56,8 @@ interface SubmissionEntry {
   pto_hours_deducted?: number | null
   supervisor_action_at?: string | null
   supervisor_action_by?: string | null
+  decision_note?: string | null
+  decision_last_updated_by_role?: 'supervisor' | 'hr_admin' | null
   notes?: string | null
   hr_excused?: boolean
 }
@@ -70,6 +72,7 @@ interface LogGroup {
 }
 
 type ViewMode = 'summary' | 'log' | 'calendar'
+type DecisionAction = 'approve' | 'unpaid' | 'deny'
 
 function getDefaultRange() {
   const now = new Date()
@@ -149,6 +152,18 @@ function summarizeGroupStatuses(entries: SubmissionEntry[]) {
     .join(', ')
 }
 
+function getDecisionAction(entry: SubmissionEntry): DecisionAction {
+  if (entry.approval_status === 'denied') return 'deny'
+  if (entry.pay_type === 'unpaid') return 'unpaid'
+  return 'approve'
+}
+
+function getDecisionActorLabel(entry: SubmissionEntry) {
+  if (entry.decision_last_updated_by_role === 'hr_admin') return 'HR override'
+  if (entry.decision_last_updated_by_role === 'supervisor') return 'Supervisor decision'
+  return null
+}
+
 export default function ReportsPage() {
   const CALENDAR_PREVIEW_COUNT = 3
   const defaults = getDefaultRange()
@@ -162,6 +177,11 @@ export default function ReportsPage() {
   const [expandedName, setExpandedName] = useState<string | null>(null)
   const [expandedLogGroups, setExpandedLogGroups] = useState<Record<string, boolean>>({})
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null)
+  const [editingEntry, setEditingEntry] = useState<SubmissionEntry | null>(null)
+  const [editDecision, setEditDecision] = useState<DecisionAction>('approve')
+  const [editNote, setEditNote] = useState('')
+  const [savingDecision, setSavingDecision] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
   const [totalSubmissions, setTotalSubmissions] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('log')
 
@@ -180,6 +200,54 @@ export default function ReportsPage() {
       setTotalSubmissions(data.totalSubmissions ?? 0)
     }
   }, [startDate, endDate, nameFilter])
+
+  const openDecisionEditor = useCallback((entry: SubmissionEntry) => {
+    setEditingEntry(entry)
+    setEditDecision(getDecisionAction(entry))
+    setEditNote(entry.decision_note ?? '')
+    setDecisionError(null)
+  }, [])
+
+  const closeDecisionEditor = useCallback(() => {
+    if (savingDecision) return
+    setEditingEntry(null)
+    setEditDecision('approve')
+    setEditNote('')
+    setDecisionError(null)
+  }, [savingDecision])
+
+  const handleDecisionSave = useCallback(async () => {
+    if (!editingEntry) return
+
+    setSavingDecision(true)
+    setDecisionError(null)
+
+    try {
+      const res = await fetch(`/api/submissions/${editingEntry.id}/decision`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: editDecision,
+          note: editNote.trim() || null,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setDecisionError(data.error ?? 'Unable to save this HR change.')
+        return
+      }
+
+      await handleSearch()
+      setEditingEntry(null)
+      setEditDecision('approve')
+      setEditNote('')
+    } catch {
+      setDecisionError('Unable to save this HR change.')
+    } finally {
+      setSavingDecision(false)
+    }
+  }, [editingEntry, editDecision, editNote, handleSearch])
 
   const hasPto = staff.some((s) => s.pto_balance !== null)
   const hasEmployeeId = staff.some((s) => s.employee_id)
@@ -262,6 +330,8 @@ export default function ReportsPage() {
       'Approved PTO Hours',
       'Supervisor',
       'Notes',
+      'Decision Note',
+      'Decision Source',
     ]
     const rows = [
       headers,
@@ -279,6 +349,8 @@ export default function ReportsPage() {
         entry.pto_hours_deducted ? formatPtoHours(entry.pto_hours_deducted, { suffix: false }) : '',
         entry.supervisor_action_by ?? entry.supervisor_name ?? '',
         entry.notes ?? '',
+        entry.decision_note ?? '',
+        getDecisionActorLabel(entry) ?? '',
       ]),
     ]
     const csv = rows.map((r) => r.map((v) => `"${v ?? ''}"`).join(',')).join('\n')
@@ -523,9 +595,32 @@ export default function ReportsPage() {
                           <td className="px-5 py-4 text-sm text-slate-600">
                             {count > 1 ? 'Multiple times' : (entry.supervisor_action_at ? new Date(entry.supervisor_action_at).toLocaleString('en-US') : 'Pending')}
                           </td>
-                          <td className="px-5 py-4 text-sm text-slate-600">{entry.supervisor_action_by ?? entry.supervisor_name ?? '—'}</td>
+                          <td className="px-5 py-4 text-sm text-slate-600">
+                            <div>
+                              <p>{entry.supervisor_action_by ?? entry.supervisor_name ?? '—'}</p>
+                              {getDecisionActorLabel(entry) && (
+                                <p className="text-xs text-indigo-600 mt-1">{getDecisionActorLabel(entry)}</p>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-5 py-4 text-sm text-slate-500 max-w-xs">
-                            {count > 1 ? 'Open group to read each note' : (entry.notes || '—')}
+                            {count > 1 ? (
+                              'Open group to read each note'
+                            ) : (
+                              <div className="space-y-1">
+                                <p>{entry.notes || '—'}</p>
+                                {entry.decision_note && (
+                                  <p className="text-xs text-indigo-600">HR note: {entry.decision_note}</p>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => openDecisionEditor(entry)}
+                                  className="rounded-lg border border-indigo-200 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors"
+                                >
+                                  Edit decision
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                         {count > 1 && isExpanded && (
@@ -547,10 +642,24 @@ export default function ReportsPage() {
                                             {PAY_TYPE_LABELS[item.pay_type]}
                                           </span>
                                         )}
+                                        {getDecisionActorLabel(item) && (
+                                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            {getDecisionActorLabel(item)}
+                                          </span>
+                                        )}
                                       </div>
-                                      <p className="text-xs text-slate-400">
-                                        {item.supervisor_action_at ? new Date(item.supervisor_action_at).toLocaleString('en-US') : 'Pending'}
-                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-xs text-slate-400">
+                                          {item.supervisor_action_at ? new Date(item.supervisor_action_at).toLocaleString('en-US') : 'Pending'}
+                                        </p>
+                                        <button
+                                          type="button"
+                                          onClick={() => openDecisionEditor(item)}
+                                          className="rounded-lg border border-indigo-200 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors"
+                                        >
+                                          Edit decision
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                                       <div>
@@ -568,8 +677,14 @@ export default function ReportsPage() {
                                     </div>
                                     {item.notes && (
                                       <div className="mt-3">
-                                        <p className="text-slate-400 text-sm">Notes</p>
+                                        <p className="text-slate-400 text-sm">Staff Notes</p>
                                         <p className="text-sm text-slate-700 mt-1">{item.notes}</p>
+                                      </div>
+                                    )}
+                                    {item.decision_note && (
+                                      <div className="mt-3">
+                                        <p className="text-slate-400 text-sm">HR Decision Note</p>
+                                        <p className="text-sm text-indigo-700 mt-1">{item.decision_note}</p>
                                       </div>
                                     )}
                                   </div>
@@ -781,6 +896,11 @@ export default function ReportsPage() {
                         {PAY_TYPE_LABELS[entry.pay_type]}
                       </span>
                     )}
+                    {getDecisionActorLabel(entry) && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {getDecisionActorLabel(entry)}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
@@ -800,14 +920,92 @@ export default function ReportsPage() {
                       <p className="text-slate-700">{entry.pto_hours_deducted ? formatPtoHours(entry.pto_hours_deducted) : '—'}</p>
                     </div>
                   </div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500">
+                      {entry.decision_note ? `HR note: ${entry.decision_note}` : 'HR can override the supervisor decision if needed.'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openDecisionEditor(entry)}
+                      className="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors"
+                    >
+                      Edit decision
+                    </button>
+                  </div>
                   {entry.notes && (
                     <div className="mt-3">
-                      <p className="text-slate-400 text-sm">Notes</p>
+                      <p className="text-slate-400 text-sm">Staff Notes</p>
                       <p className="text-sm text-slate-700 mt-1">{entry.notes}</p>
                     </div>
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {editingEntry && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close decision editor"
+            onClick={closeDecisionEditor}
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+          />
+          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">HR Override</p>
+              <h2 className="text-lg font-bold text-slate-900 mt-1">{editingEntry.staff_name}</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {formatDateLabel(editingEntry.date)} · {STATUS_LABELS[editingEntry.status] ?? editingEntry.status}
+              </p>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Decision</label>
+                <select
+                  value={editDecision}
+                  onChange={(event) => setEditDecision(event.target.value as DecisionAction)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="approve">Approve PTO</option>
+                  <option value="unpaid">Approve Unpaid</option>
+                  <option value="deny">Deny</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Audit Note</label>
+                <textarea
+                  value={editNote}
+                  onChange={(event) => setEditNote(event.target.value)}
+                  rows={4}
+                  placeholder="Optional note explaining why HR changed the decision."
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+              {decisionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {decisionError}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={closeDecisionEditor}
+                disabled={savingDecision}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDecisionSave}
+                disabled={savingDecision}
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {savingDecision ? 'Saving...' : 'Save HR change'}
+              </button>
             </div>
           </div>
         </div>

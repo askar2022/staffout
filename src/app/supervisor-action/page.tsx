@@ -1,9 +1,7 @@
 import Link from 'next/link'
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { resolveSubmissionPayType } from '@/lib/submission-pay'
-import { sendEmail } from '@/lib/email/resend'
-import { buildSupervisorDecisionEmail } from '@/lib/email/templates'
+import { applySubmissionDecision } from '@/lib/submission-decision'
 import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, type Submission } from '@/lib/types'
 
 type Action = 'approve' | 'unpaid' | 'deny'
@@ -41,172 +39,21 @@ export default async function SupervisorActionPage({
   let updatedApprovalStatus = sub.approval_status
   let updatedPayType = sub.pay_type
   let message = 'No changes were needed.'
+  const result = await applySubmissionDecision({
+    db,
+    submission: sub,
+    actorName: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
+    actorRole: 'supervisor',
+    action,
+    orgName: sub.organizations?.name ?? 'StaffOut',
+    replyTo: sub.organizations?.reply_to_email ?? undefined,
+  })
 
-  const staffId = sub.staff_id
-  const orgId = sub.organization_id
+  updatedApprovalStatus = result.updatedSubmission.approval_status
+  updatedPayType = result.updatedSubmission.pay_type
+  message = result.message
 
-  let ptoBalance: number | null = null
-  let ptoUsedBefore = 0
-
-  if (staffId) {
-    const [{ data: member }, { data: priorRows }] = await Promise.all([
-      db
-        .from('staff_members')
-        .select('pto_balance')
-        .eq('id', staffId)
-        .eq('organization_id', orgId)
-        .single(),
-      db
-        .from('submissions')
-        .select('pto_hours_deducted')
-        .eq('staff_id', staffId)
-        .eq('organization_id', orgId)
-        .neq('id', sub.id)
-        .not('pto_hours_deducted', 'is', null),
-    ])
-
-    ptoBalance = member?.pto_balance ?? null
-    ptoUsedBefore = (priorRows ?? []).reduce((sum, row) => sum + (row.pto_hours_deducted ?? 0), 0)
-  }
-
-  let changed = false
-  let employeeEmailNotification: Submission | null = null
-
-  if (action === 'approve') {
-    const resolution = resolveSubmissionPayType({
-      requestedPayType: 'pto',
-      requestedHours: sub.pto_hours_requested ?? null,
-      balance: ptoBalance,
-      used: ptoUsedBefore,
-    })
-
-    updatedApprovalStatus = 'approved'
-    updatedPayType = resolution.payType
-
-    if (
-      sub.approval_status !== 'approved' ||
-      sub.pay_type !== resolution.payType ||
-      (sub.pto_hours_deducted ?? null) !== (resolution.payType === 'pto' ? resolution.approvedHours : null)
-    ) {
-      changed = true
-      const updatedSubmission = {
-        ...sub,
-        approval_status: 'approved',
-        pay_type: resolution.payType,
-        pto_hours_deducted: resolution.payType === 'pto' ? resolution.approvedHours : null,
-        supervisor_action_at: new Date().toISOString(),
-        supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-        pto_balance_total: ptoBalance,
-        pto_used_total: ptoUsedBefore + (resolution.payType === 'pto' ? (resolution.approvedHours ?? 0) : 0),
-        pto_remaining_after:
-          ptoBalance !== null
-            ? ptoBalance - ptoUsedBefore - (resolution.payType === 'pto' ? (resolution.approvedHours ?? 0) : 0)
-            : null,
-      } satisfies Submission
-
-      await db
-        .from('submissions')
-        .update({
-          approval_status: updatedSubmission.approval_status,
-          pay_type: updatedSubmission.pay_type,
-          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
-          supervisor_action_at: updatedSubmission.supervisor_action_at,
-          supervisor_action_by: updatedSubmission.supervisor_action_by,
-        })
-        .eq('id', sub.id)
-
-      employeeEmailNotification = updatedSubmission
-    }
-
-    message = resolution.autoSwitchedToUnpaid
-      ? 'PTO was not available, so this submission was approved as unpaid.'
-      : 'This submission was approved for PTO.'
-  } else if (action === 'unpaid') {
-    updatedApprovalStatus = 'approved'
-    updatedPayType = 'unpaid'
-
-    if (sub.approval_status !== 'approved' || sub.pay_type !== 'unpaid' || sub.pto_hours_deducted !== null) {
-      changed = true
-      const updatedSubmission = {
-        ...sub,
-        approval_status: 'approved',
-        pay_type: 'unpaid',
-        pto_hours_deducted: null,
-        supervisor_action_at: new Date().toISOString(),
-        supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-        pto_balance_total: ptoBalance,
-        pto_used_total: ptoUsedBefore,
-        pto_remaining_after:
-          ptoBalance !== null
-            ? ptoBalance - ptoUsedBefore
-            : null,
-      } satisfies Submission
-
-      await db
-        .from('submissions')
-        .update({
-          approval_status: updatedSubmission.approval_status,
-          pay_type: updatedSubmission.pay_type,
-          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
-          supervisor_action_at: updatedSubmission.supervisor_action_at,
-          supervisor_action_by: updatedSubmission.supervisor_action_by,
-        })
-        .eq('id', sub.id)
-
-      employeeEmailNotification = updatedSubmission
-    }
-
-    message = 'This submission was approved as unpaid.'
-  } else {
-    updatedApprovalStatus = 'denied'
-
-    if (sub.approval_status !== 'denied' || sub.pto_hours_deducted !== null) {
-      changed = true
-      const updatedSubmission = {
-        ...sub,
-        approval_status: 'denied',
-        pto_hours_deducted: null,
-        supervisor_action_at: new Date().toISOString(),
-        supervisor_action_by: sub.supervisor_email ?? sub.supervisor_name ?? 'Supervisor',
-        pto_balance_total: ptoBalance,
-        pto_used_total: ptoUsedBefore,
-        pto_remaining_after:
-          ptoBalance !== null
-            ? ptoBalance - ptoUsedBefore
-            : null,
-      } satisfies Submission
-
-      await db
-        .from('submissions')
-        .update({
-          approval_status: updatedSubmission.approval_status,
-          pto_hours_deducted: updatedSubmission.pto_hours_deducted,
-          supervisor_action_at: updatedSubmission.supervisor_action_at,
-          supervisor_action_by: updatedSubmission.supervisor_action_by,
-        })
-        .eq('id', sub.id)
-
-      employeeEmailNotification = updatedSubmission
-    }
-
-    message = 'This submission was denied.'
-  }
-
-  if (changed && employeeEmailNotification?.staff_email) {
-    const { subject, html, text } = buildSupervisorDecisionEmail(
-      sub.organizations?.name ?? 'StaffOut',
-      employeeEmailNotification
-    )
-    await sendEmail({
-      to: [employeeEmailNotification.staff_email],
-      subject,
-      html,
-      text,
-      replyTo: sub.organizations?.reply_to_email ?? undefined,
-    })
-  }
-
-  if (!changed) {
+  if (!result.changed) {
     message = `${message} The employee was already notified previously.`
   }
 
