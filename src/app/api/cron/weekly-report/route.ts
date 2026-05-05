@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email/resend'
 import { buildWeeklyReportEmail, DaySummary } from '@/lib/email/templates'
 import { apiError, apiOk } from '@/lib/auth'
 import type { Submission } from '@/lib/types'
+import { filterSubmissionsForCampusScope, normalizeCampusScope } from '@/lib/notification-scope'
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -54,52 +55,74 @@ export async function GET(request: Request) {
       // Weekly report goes to admin + leadership only
       const { data: rawRecipients } = await db
         .from('notification_recipients')
-        .select('email, type')
+        .select('email, type, campus_scope')
         .eq('organization_id', org.id)
         .in('type', ['admin', 'leadership'])
 
-      const summaryEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
+      const recipients = (rawRecipients ?? []) as {
+        email: string
+        type: string
+        campus_scope: string | null
+      }[]
 
-      if (!summaryEmails.length) {
+      if (!recipients.length) {
         results.push({ org: org.name, skipped: 'no recipients configured' })
         continue
       }
 
-      // Build per-day summary
-      const days: DaySummary[] = weekDays.map((d) => {
-        const dateStr = d.toISOString().split('T')[0]
-        const daySubs = submissions.filter((s) => s.date === dateStr)
-        return {
-          label: d.toLocaleDateString('en-US', { weekday: 'long' }),
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          absent: daySubs.filter((s) => s.status === 'absent').length,
-          late: daySubs.filter((s) => s.status === 'late').length,
-          leaving: daySubs.filter((s) => s.status === 'leaving_early' || s.status === 'appointment').length,
-          personal: daySubs.filter((s) => s.status === 'personal_day').length,
-          total: daySubs.length,
-        }
-      })
+      let emailsSent = 0
 
-      const { subject, html, text } = buildWeeklyReportEmail(org.name, days, weekLabel)
+      const scopes = [...new Set(recipients.map((r) => normalizeCampusScope(r.campus_scope) ?? '__ALL__'))]
 
-      const emailResult = await sendEmail({
-        to: summaryEmails,
-        subject,
-        html,
-        text,
-        replyTo: org.reply_to_email ?? undefined,
-      })
+      for (const scopeKey of scopes) {
+        const campusScope = scopeKey === '__ALL__' ? null : scopeKey
+        const scopedSubs = filterSubmissionsForCampusScope(submissions, campusScope)
 
-      await db.from('email_logs').insert({
-        organization_id: org.id,
-        type: 'summary',
-        recipients: summaryEmails,
-        subject,
-        success: emailResult.success,
-        error_message: emailResult.success ? null : (emailResult as { error?: string }).error ?? null,
-      })
+        const summaryEmails = recipients
+          .filter((r) => normalizeCampusScope(r.campus_scope) === campusScope)
+          .map((r) => r.email)
 
-      results.push({ org: org.name, weekLabel, emailsSent: summaryEmails.length })
+        if (!summaryEmails.length) continue
+
+        // Build per-day summary (scoped)
+        const days: DaySummary[] = weekDays.map((d) => {
+          const dateStr = d.toISOString().split('T')[0]
+          const daySubs = scopedSubs.filter((s) => s.date === dateStr)
+          return {
+            label: d.toLocaleDateString('en-US', { weekday: 'long' }),
+            date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            absent: daySubs.filter((s) => s.status === 'absent').length,
+            late: daySubs.filter((s) => s.status === 'late').length,
+            leaving: daySubs.filter((s) => s.status === 'leaving_early' || s.status === 'appointment').length,
+            personal: daySubs.filter((s) => s.status === 'personal_day').length,
+            total: daySubs.length,
+          }
+        })
+
+        const subjectSuffix = campusScope ? ` (${campusScope})` : ''
+        const { subject, html, text } = buildWeeklyReportEmail(`${org.name}${subjectSuffix}`, days, weekLabel)
+
+        const emailResult = await sendEmail({
+          to: summaryEmails,
+          subject,
+          html,
+          text,
+          replyTo: org.reply_to_email ?? undefined,
+        })
+
+        emailsSent += summaryEmails.length
+
+        await db.from('email_logs').insert({
+          organization_id: org.id,
+          type: 'summary',
+          recipients: summaryEmails,
+          subject,
+          success: emailResult.success,
+          error_message: emailResult.success ? null : (emailResult as { error?: string }).error ?? null,
+        })
+      }
+
+      results.push({ org: org.name, weekLabel, recipientEmailsSent: emailsSent })
     }
 
     return apiOk({ success: true, results })

@@ -15,6 +15,13 @@ interface Props {
   orgSlug: string
 }
 
+const CAMPUS_SCOPE_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'All schools / umbrella (every submission)' },
+  { value: 'Harvest Best Academy', label: 'Harvest Best Academy' },
+  { value: 'Sankofa Prep', label: 'Sankofa Prep' },
+  { value: 'Wakanda Virtual Academy', label: 'Wakanda Virtual Academy' },
+]
+
 export default function SettingsForm({ org, initialRecipients, orgSlug }: Props) {
   const [orgName, setOrgName] = useState(org?.name ?? '')
   const [replyTo, setReplyTo] = useState(org?.reply_to_email ?? '')
@@ -24,7 +31,12 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
   const [orgError, setOrgError] = useState('')
 
   const [recipients, setRecipients] = useState<NotificationRecipient[]>(initialRecipients)
-  const [newRecipient, setNewRecipient] = useState({ name: '', email: '', type: 'admin' as const })
+  const [newRecipient, setNewRecipient] = useState({
+    name: '',
+    email: '',
+    type: 'admin' as NotificationRecipient['type'],
+    campus_scope: '',
+  })
   const [addingRecipient, setAddingRecipient] = useState(false)
   const [recipientError, setRecipientError] = useState('')
 
@@ -80,7 +92,12 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
     const res = await fetch('/api/recipients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRecipient),
+      body: JSON.stringify({
+        name: newRecipient.name,
+        email: newRecipient.email,
+        type: newRecipient.type,
+        campus_scope: newRecipient.campus_scope.trim() || null,
+      }),
     })
     const data = await res.json()
     setAddingRecipient(false)
@@ -89,7 +106,7 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
       setRecipientError(data.error || 'Failed to add recipient')
     } else {
       setRecipients((prev) => [...prev, data.recipient as NotificationRecipient])
-      setNewRecipient({ name: '', email: '', type: 'admin' })
+      setNewRecipient({ name: '', email: '', type: 'admin', campus_scope: '' })
     }
   }
 
@@ -247,7 +264,11 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
           <Mail className="w-4 h-4 text-slate-500" />
           Notification Recipients
         </h2>
-        <p className="text-sm text-slate-500 mb-5">Admin gets everything. Leadership gets the Friday weekly report only. All Staff gets 8 AM + instant alerts.</p>
+        <p className="text-sm text-slate-500 mb-5">
+          Admin gets everything. Leadership gets the Friday weekly report only. All Staff gets 8 AM + instant alerts.
+          Pick a <strong>school site</strong> when this row should only receive call-outs for that campus (for example a Google Group per site).
+          Leave site as “All schools” for umbrella recipients like HR.
+        </p>
 
         <div className="space-y-2 mb-4">
           {recipients.map((r) => (
@@ -255,6 +276,11 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{r.name}</p>
                 <p className="text-xs text-slate-500 truncate">{r.email}</p>
+                {r.campus_scope ? (
+                  <p className="text-[11px] text-indigo-600 mt-0.5 font-medium truncate">Site: {r.campus_scope}</p>
+                ) : (
+                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">All schools</p>
+                )}
               </div>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadgeColor[r.type] ?? 'bg-slate-100 text-slate-600'}`}>
                 {typeLabels[r.type] ?? r.type}
@@ -297,7 +323,7 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
             <input
               type="text"
               value={newRecipient.name}
@@ -314,7 +340,9 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
             />
             <select
               value={newRecipient.type}
-              onChange={(e) => setNewRecipient((p) => ({ ...p, type: e.target.value as 'admin' }))}
+              onChange={(e) =>
+                setNewRecipient((p) => ({ ...p, type: e.target.value as NotificationRecipient['type'] }))
+              }
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
               <option value="admin">Admin — gets everything</option>
@@ -322,6 +350,17 @@ export default function SettingsForm({ org, initialRecipients, orgSlug }: Props)
               <option value="all_staff">All Staff — 8 AM summary + instant alerts</option>
               <option value="reception">Reception — 8 AM summary + instant alerts</option>
               <option value="hr">HR — 8 AM summary + instant alerts</option>
+            </select>
+            <select
+              value={newRecipient.campus_scope}
+              onChange={(e) => setNewRecipient((p) => ({ ...p, campus_scope: e.target.value }))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              {CAMPUS_SCOPE_OPTIONS.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
           <button

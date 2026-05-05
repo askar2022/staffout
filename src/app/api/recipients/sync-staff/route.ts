@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, apiError, apiOk, AuthError } from '@/lib/auth'
+import { normalizeCampusScope } from '@/lib/notification-scope'
 
 export async function POST() {
   try {
@@ -9,7 +10,7 @@ export async function POST() {
     // Get all active staff members
     const { data: staffList, error: staffError } = await db
       .from('staff_members')
-      .select('full_name, email')
+      .select('full_name, email, campus')
       .eq('organization_id', orgId)
       .eq('is_active', true)
       .not('email', 'is', null)
@@ -20,17 +21,28 @@ export async function POST() {
     // Get existing recipient emails to avoid duplicates
     const { data: existing } = await db
       .from('notification_recipients')
-      .select('email')
+      .select('email, campus_scope')
       .eq('organization_id', orgId)
 
-    const existingEmails = new Set((existing ?? []).map((r: { email: string }) => r.email.toLowerCase()))
+    const existingKeys = new Set(
+      (existing ?? []).map((r: { email: string; campus_scope: string | null }) => {
+        const scope = normalizeCampusScope(r.campus_scope)
+        return `${r.email.toLowerCase()}::${scope ?? ''}`
+      })
+    )
 
     const toInsert = staffList
-      .filter((s) => s.email && !existingEmails.has(s.email.toLowerCase()))
+      .filter((s) => {
+        if (!s.email) return false
+        const scope = normalizeCampusScope(s.campus)
+        const key = `${s.email.toLowerCase()}::${scope ?? ''}`
+        return !existingKeys.has(key)
+      })
       .map((s) => ({
         organization_id: orgId,
         name: s.full_name,
         email: s.email,
+        campus_scope: normalizeCampusScope(s.campus),
         type: 'all_staff',
         receives_summary: true,
         receives_instant: true,

@@ -30,11 +30,14 @@ create table if not exists notification_recipients (
   organization_id uuid references organizations(id) on delete cascade,
   name text not null,
   email text not null,
+  campus_scope text default null,
   type text not null, -- 'all_staff', 'admin', 'reception', 'hr'
   receives_summary boolean default true,
   receives_instant boolean default true,
   created_at timestamptz default now()
 );
+
+alter table notification_recipients add column if not exists campus_scope text default null;
 
 -- Staff members directory
 create table if not exists staff_members (

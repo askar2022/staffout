@@ -11,6 +11,7 @@ import {
   buildHrExcuseEmail,
 } from '@/lib/email/templates'
 import type { Submission } from '@/lib/types'
+import { recipientMatchesSubmissionCampus } from '@/lib/notification-scope'
 
 const ALLOWED_STATUSES = ['absent', 'late', 'leaving_early', 'appointment', 'personal_day']
 const ALLOWED_REASONS = ['sick', 'personal', 'family', 'medical', 'other']
@@ -212,11 +213,15 @@ export async function POST(request: NextRequest) {
     if (isDuringSchoolHours()) {
       const { data: rawRecipients } = await db
         .from('notification_recipients')
-        .select('email')
+        .select('email, campus_scope')
         .eq('organization_id', orgId)
         .eq('receives_instant', true)
 
-      const instantEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
+      const instantEmails = (rawRecipients ?? [])
+        .filter((r: { campus_scope?: string | null }) =>
+          recipientMatchesSubmissionCampus(r.campus_scope, sub.campus)
+        )
+        .map((r: { email: string }) => r.email)
 
       if (instantEmails.length > 0) {
         const { subject, html, text } = buildInstantEmail(org.name, sub)

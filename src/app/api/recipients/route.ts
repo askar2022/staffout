@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAuth, sanitize, isValidEmail, apiError, apiOk, AuthError } from '@/lib/auth'
+import { normalizeCampusScope } from '@/lib/notification-scope'
 
 const ALLOWED_TYPES = ['all_staff', 'admin', 'leadership', 'reception', 'hr']
 
@@ -18,7 +19,7 @@ export async function GET() {
 
     const { data, error } = await db
       .from('notification_recipients')
-      .select('id, name, email, type, receives_summary, receives_instant')
+      .select('id, name, email, campus_scope, type, receives_summary, receives_instant')
       .eq('organization_id', orgId)
       .order('created_at')
 
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
     const type = sanitize(body.type, 50)
     if (!ALLOWED_TYPES.includes(type)) return apiError('Invalid recipient type')
 
+    const campusScopeRaw = body.campus_scope
+    const campus_scope =
+      typeof campusScopeRaw === 'string' ? normalizeCampusScope(sanitize(campusScopeRaw, 100)) : null
+
     const db = createAdminClient()
     const flags = flagsForType(type)
     const { data, error } = await db
@@ -52,10 +57,11 @@ export async function POST(request: NextRequest) {
         organization_id: orgId,
         name,
         email,
+        campus_scope,
         type,
         ...flags,
       })
-      .select('id, name, email, type, receives_summary, receives_instant')
+      .select('id, name, email, campus_scope, type, receives_summary, receives_instant')
       .single()
 
     if (error) return apiError('Failed to add recipient', 500)

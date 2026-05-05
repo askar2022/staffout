@@ -3,6 +3,7 @@ import { requireAuth, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { buildSummaryEmail } from '@/lib/email/templates'
 import type { Submission } from '@/lib/types'
+import { filterSubmissionsForCampusScope, normalizeCampusScope } from '@/lib/notification-scope'
 
 export async function POST() {
   try {
@@ -32,36 +33,52 @@ export async function POST() {
     // Get summary recipients
     const { data: rawRecipients } = await db
       .from('notification_recipients')
-      .select('email')
+      .select('email, campus_scope')
       .eq('organization_id', orgId)
       .eq('receives_summary', true)
 
-    const summaryEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
+    const recipients = (rawRecipients ?? []) as { email: string; campus_scope: string | null }[]
 
-    if (!summaryEmails.length) {
+    if (!recipients.length) {
       return apiError('No summary recipients configured. Go to Settings → Notification Recipients and add someone with Summary enabled.', 400)
     }
 
-    const { subject, html, text } = buildSummaryEmail(org.name, submissions, new Date())
+    let emailsSent = 0
 
-    // Add [TEST] prefix so it's clear this is a test
-    const testSubject = `[TEST] ${subject}`
+    const scopes = [...new Set(recipients.map((r) => normalizeCampusScope(r.campus_scope) ?? '__ALL__'))]
 
-    const result = await sendEmail({
-      to: summaryEmails,
-      subject: testSubject,
-      html,
-      text,
-      replyTo: org.reply_to_email ?? undefined,
-    })
+    for (const scopeKey of scopes) {
+      const campusScope = scopeKey === '__ALL__' ? null : scopeKey
+      const scopedSubmissions = filterSubmissionsForCampusScope(submissions, campusScope)
+      const summaryEmails = recipients
+        .filter((r) => normalizeCampusScope(r.campus_scope) === campusScope)
+        .map((r) => r.email)
 
-    if (!result.success) {
-      return apiError('Failed to send test email. Check your Resend configuration.', 500)
+      if (!summaryEmails.length) continue
+
+      const { subject, html, text } = buildSummaryEmail(org.name, scopedSubmissions, new Date())
+
+      const scopeSuffix = campusScope ? ` [${campusScope}]` : ''
+      const testSubject = `[TEST]${scopeSuffix} ${subject}`
+
+      const result = await sendEmail({
+        to: summaryEmails,
+        subject: testSubject,
+        html,
+        text,
+        replyTo: org.reply_to_email ?? undefined,
+      })
+
+      if (!result.success) {
+        return apiError('Failed to send test email. Check your Resend configuration.', 500)
+      }
+
+      emailsSent += summaryEmails.length
     }
 
     return apiOk({
       success: true,
-      sentTo: summaryEmails,
+      recipientEmailsSent: emailsSent,
       submissionsIncluded: submissions.length,
     })
   } catch (err) {

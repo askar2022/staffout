@@ -107,7 +107,9 @@ export interface NotificationRecipient {
   organization_id: string
   name: string
   email: string
-  type: 'all_staff' | 'admin' | 'reception' | 'hr'
+  /** When set, this recipient only gets summaries/instant alerts for submissions from this campus (matches submissions.campus) */
+  campus_scope?: string | null
+  type: 'all_staff' | 'admin' | 'leadership' | 'reception' | 'hr'
   receives_summary: boolean
   receives_instant: boolean
 }

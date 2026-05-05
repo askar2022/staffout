@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email/resend'
 import { buildSummaryEmail, buildSupervisorEmail } from '@/lib/email/templates'
 import { apiError, apiOk } from '@/lib/auth'
 import type { Submission } from '@/lib/types'
+import { filterSubmissionsForCampusScope, normalizeCampusScope } from '@/lib/notification-scope'
 
 export async function GET(request: Request) {
   // Verify cron secret — Vercel sets this header automatically
@@ -48,35 +49,51 @@ export async function GET(request: Request) {
 
       const { data: rawRecipients } = await db
         .from('notification_recipients')
-        .select('email')
+        .select('email, campus_scope')
         .eq('organization_id', org.id)
         .eq('receives_summary', true)
 
-      const summaryEmails = (rawRecipients ?? []).map((r: { email: string }) => r.email)
+      const recipients = (rawRecipients ?? []) as { email: string; campus_scope: string | null }[]
 
-      if (!summaryEmails.length) {
+      if (!recipients.length) {
         results.push({ org: org.name, skipped: 'no recipients configured' })
         continue
       }
 
-      const { subject, html, text } = buildSummaryEmail(org.name, submissions, new Date())
+      let summaryEmailsSent = 0
 
-      const emailResult = await sendEmail({
-        to: summaryEmails,
-        subject,
-        html,
-        text,
-        replyTo: org.reply_to_email ?? undefined,
-      })
+      const scopes = [...new Set(recipients.map((r) => normalizeCampusScope(r.campus_scope) ?? '__ALL__'))]
 
-      await db.from('email_logs').insert({
-        organization_id: org.id,
-        type: 'summary',
-        recipients: summaryEmails,
-        subject,
-        success: emailResult.success,
-        error_message: emailResult.success ? null : (emailResult as { error?: string }).error ?? null,
-      })
+      for (const scopeKey of scopes) {
+        const campusScope = scopeKey === '__ALL__' ? null : scopeKey
+        const scopedSubmissions = filterSubmissionsForCampusScope(submissions, campusScope)
+        const summaryEmails = recipients
+          .filter((r) => normalizeCampusScope(r.campus_scope) === campusScope)
+          .map((r) => r.email)
+
+        if (!summaryEmails.length) continue
+
+        const { subject, html, text } = buildSummaryEmail(org.name, scopedSubmissions, new Date())
+
+        const emailResult = await sendEmail({
+          to: summaryEmails,
+          subject,
+          html,
+          text,
+          replyTo: org.reply_to_email ?? undefined,
+        })
+
+        summaryEmailsSent += summaryEmails.length
+
+        await db.from('email_logs').insert({
+          organization_id: org.id,
+          type: 'summary',
+          recipients: summaryEmails,
+          subject,
+          success: emailResult.success,
+          error_message: emailResult.success ? null : (emailResult as { error?: string }).error ?? null,
+        })
+      }
 
       // Supervisor notices only for today's new absent staff
       const absentStaff = todaySubmissions.filter(
@@ -106,7 +123,7 @@ export async function GET(request: Request) {
       results.push({
         org: org.name,
         submissions: submissions.length,
-        emailsSent: summaryEmails.length,
+        summaryRecipientEmails: summaryEmailsSent,
         carriedForwardMultiDay: ongoingSubmissions.length,
         supervisorAlerts: absentStaff.length,
       })
