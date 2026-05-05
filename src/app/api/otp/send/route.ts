@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { getOtpSendRateLimitMessage } from '@/lib/public-security'
+import { getActiveOrgCampuses } from '@/lib/org-campuses'
 
 function generateCode(): string {
   return randomInt(100000, 1000000).toString()
@@ -13,6 +14,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const email = normalizeWorkEmail(sanitize(body.email, 200))
+    const campusRaw = sanitize(body.campus ?? '', 200)
+    const campus = campusRaw.trim() || null
 
     if (!email || !isValidEmail(email)) {
       return apiError('Valid work email is required')
@@ -43,9 +46,7 @@ export async function POST(request: NextRequest) {
       orgName = org.name
     }
 
-    // Find the staff member — scoped to the org if we have one
-    // Use ilike (case-insensitive) + limit(1): .single() fails when duplicate rows exist for the same email;
-    // mixed-case storage (A@x.com vs a@x.com) also broke .eq() lookups.
+    // Find staff rows — scoped to org when known (case-insensitive email).
     let staffQuery = db
       .from('staff_members')
       .select('id, full_name, organization_id, position, campus')
@@ -56,12 +57,33 @@ export async function POST(request: NextRequest) {
       staffQuery = staffQuery.eq('organization_id', orgId)
     }
 
-    const { data: staffRows } = await staffQuery.limit(1)
-    const staffMember = staffRows?.[0] ?? null
+    const { data: staffRows } = await staffQuery
+    let matches = staffRows ?? []
 
-    // For real schools (non-demo), block if email is not in the staff directory
-    if (orgId && orgSlug !== 'demo' && !staffMember) {
-      return apiError('This email is not in the staff directory. Contact your administrator to be added.', 403)
+    let orgCampuses: string[] = []
+    if (orgId && orgSlug !== 'demo') {
+      orgCampuses = await getActiveOrgCampuses(db, orgId)
+      if (orgCampuses.length > 1 && !campus) {
+        return apiError('Please select the school or campus where you work.', 400)
+      }
+      if (campus) {
+        matches = matches.filter((m) => m.campus === campus)
+      }
+    }
+
+    const staffMember = matches[0] ?? null
+
+    // For real schools (non-demo), block if email is not in the staff directory (or not at selected campus)
+    if (orgId && orgSlug !== 'demo') {
+      if ((staffRows ?? []).length === 0) {
+        return apiError('This email is not in the staff directory. Contact your administrator to be added.', 403)
+      }
+      if (!staffMember) {
+        return apiError(
+          'This email is not listed at the campus you selected. Pick the correct school or contact your administrator.',
+          403,
+        )
+      }
     }
 
     // No org resolved yet — try to find it from the staff member's org

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Paperclip, X, CalendarRange } from 'lucide-react'
+import { CheckCircle, Zap, Mail, ArrowRight, RefreshCw, ShieldCheck, Clock, Paperclip, X, CalendarRange, MapPin } from 'lucide-react'
 import { APPROVAL_STATUS_LABELS, PAY_TYPE_LABELS, REASON_LABELS, STATUS_LABELS } from '@/lib/types'
 import Link from 'next/link'
 import { getClientOrgSlug } from '@/lib/org-slug'
@@ -84,7 +84,7 @@ export default function SubmitPage() {
 function SubmitForm() {
   const searchParams = useSearchParams()
   const prefilledEmail = searchParams.get('email') ?? ''
-  const [step, setStep] = useState<Step>(() => (prefilledEmail ? 'code' : 'email'))
+  const [step, setStep] = useState<Step>('email')
 
   // Step 1 — email
   const [email, setEmail] = useState(prefilledEmail)
@@ -95,6 +95,14 @@ function SubmitForm() {
   const [orgSlug] = useState<string | null>(() =>
     typeof window !== 'undefined' ? getClientOrgSlug() : null
   )
+
+  /** Distinct campuses for this org (directory); drives required school picker on umbrella domains. */
+  const needsOrgCampusFetch = !!(orgSlug && orgSlug !== 'demo')
+  const [orgCampuses, setOrgCampuses] = useState<string[]>([])
+  const [campusesFetchDone, setCampusesFetchDone] = useState(!needsOrgCampusFetch)
+  const [selectedCampus, setSelectedCampus] = useState('')
+  /** Single-campus orgs infer campus; multi-campus uses the dropdown selection. */
+  const effectiveCampus = orgCampuses.length === 1 ? orgCampuses[0] : selectedCampus
 
   // Step 2 — OTP
   const [code, setCode] = useState('')
@@ -118,6 +126,37 @@ function SubmitForm() {
       })
       .catch(() => {})
   }, [orgSlug])
+
+  useEffect(() => {
+    if (!orgSlug || orgSlug === 'demo') return
+    let cancelled = false
+    fetch(`/api/public/org-campuses?slug=${encodeURIComponent(orgSlug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { campuses?: string[] } | null) => {
+        if (cancelled || !data?.campuses) return
+        setOrgCampuses(data.campuses)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setCampusesFetchDone(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [orgSlug])
+
+  useEffect(() => {
+    if (!prefilledEmail || !campusesFetchDone) return
+    queueMicrotask(() => {
+      if (!orgSlug || orgSlug === 'demo') {
+        setStep('code')
+        return
+      }
+      if (orgCampuses.length <= 1) {
+        setStep('code')
+      }
+    })
+  }, [prefilledEmail, campusesFetchDone, orgSlug, orgCampuses])
   const [status, setStatus] = useState<'' | 'absent' | 'late' | 'leaving_early'>('')
   const [expectedArrival, setExpectedArrival] = useState('')
   const [leaveTime, setLeaveTime] = useState('')
@@ -190,10 +229,20 @@ function SubmitForm() {
     setSendingCode(true)
     setSendError('')
 
+    if (orgSlug && orgSlug !== 'demo' && orgCampuses.length > 1 && !effectiveCampus.trim()) {
+      setSendError('Please select the school or campus where you work.')
+      setSendingCode(false)
+      return
+    }
+
     const res = await fetch('/api/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, org_slug: getClientOrgSlug() }),
+      body: JSON.stringify({
+        email,
+        org_slug: getClientOrgSlug(),
+        campus: effectiveCampus.trim() || undefined,
+      }),
     })
 
     const data = await res.json()
@@ -214,7 +263,11 @@ function SubmitForm() {
     const res = await fetch('/api/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code }),
+      body: JSON.stringify({
+        email,
+        code,
+        campus: effectiveCampus.trim() || undefined,
+      }),
     })
 
     const data = await res.json()
@@ -415,6 +468,7 @@ function SubmitForm() {
               setSubmittedPayType(null)
               setSubmittedApprovalStatus(null)
               setAutoSwitchedToUnpaid(false)
+              setSelectedCampus('')
             }}
             className="mt-5 text-sm text-indigo-600 font-medium hover:underline"
           >
@@ -481,9 +535,39 @@ function SubmitForm() {
                     className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 bg-white"
                   />
 
+                  {orgSlug && orgSlug !== 'demo' && orgCampuses.length > 1 && (
+                    <div className="mb-4">
+                      <label htmlFor="hero-campus" className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                        School / campus you work at
+                      </label>
+                      <select
+                        id="hero-campus"
+                        required
+                        value={selectedCampus}
+                        onChange={(e) => setSelectedCampus(e.target.value)}
+                        disabled={!campusesFetchDone}
+                        className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-60"
+                      >
+                        <option value="">{campusesFetchDone ? 'Select your school…' : 'Loading campuses…'}</option>
+                        {orgCampuses.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={sendingCode || !email}
+                    disabled={
+                      sendingCode ||
+                      !email ||
+                      !campusesFetchDone ||
+                      (orgSlug !== null &&
+                        orgSlug !== 'demo' &&
+                        orgCampuses.length > 1 &&
+                        !effectiveCampus.trim())
+                    }
                     className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {sendingCode ? 'Sending code...' : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
@@ -507,6 +591,12 @@ function SubmitForm() {
                     We sent a 6-digit code to:
                   </p>
                   <p className="font-semibold text-slate-800 text-sm mb-5">{email}</p>
+                  {effectiveCampus.trim() ? (
+                    <p className="flex items-center gap-1.5 text-xs text-slate-600 mb-4">
+                      <MapPin className="w-3.5 h-3.5 shrink-0 text-indigo-500" aria-hidden />
+                      <span>{effectiveCampus.trim()}</span>
+                    </p>
+                  ) : null}
 
                   {verifyError && (
                     <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
@@ -628,6 +718,9 @@ function SubmitForm() {
                   </span>
                   {verifiedStaff?.position && (
                     <span className="text-xs text-green-600 ml-2">· {verifiedStaff.position}</span>
+                  )}
+                  {verifiedStaff?.campus && (
+                    <span className="text-xs text-green-600 ml-2">· {verifiedStaff.campus}</span>
                   )}
                 </div>
               </div>
@@ -942,9 +1035,39 @@ function SubmitForm() {
                 className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
               />
 
+              {orgSlug && orgSlug !== 'demo' && orgCampuses.length > 1 && (
+                <div className="mb-4">
+                  <label htmlFor="fallback-campus" className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                    School / campus you work at
+                  </label>
+                  <select
+                    id="fallback-campus"
+                    required
+                    value={selectedCampus}
+                    onChange={(e) => setSelectedCampus(e.target.value)}
+                    disabled={!campusesFetchDone}
+                    className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                  >
+                    <option value="">{campusesFetchDone ? 'Select your school…' : 'Loading campuses…'}</option>
+                    {orgCampuses.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={sendingCode || !email}
+                disabled={
+                  sendingCode ||
+                  !email ||
+                  !campusesFetchDone ||
+                  (orgSlug !== null &&
+                    orgSlug !== 'demo' &&
+                    orgCampuses.length > 1 &&
+                    !effectiveCampus.trim())
+                }
                 className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {sendingCode ? 'Sending code...' : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
@@ -971,6 +1094,12 @@ function SubmitForm() {
                 We sent a 6-digit code to:
               </p>
               <p className="font-semibold text-slate-800 text-sm mb-5">{email}</p>
+              {effectiveCampus.trim() ? (
+                <p className="flex items-center gap-1.5 text-xs text-slate-600 mb-4">
+                  <MapPin className="w-3.5 h-3.5 shrink-0 text-indigo-500" aria-hidden />
+                  <span>{effectiveCampus.trim()}</span>
+                </p>
+              ) : null}
 
               {verifyError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">
@@ -1105,6 +1234,9 @@ function SubmitForm() {
                 </span>
                 {verifiedStaff?.position && (
                   <span className="text-xs text-green-600 ml-2">· {verifiedStaff.position}</span>
+                )}
+                {verifiedStaff?.campus && (
+                  <span className="text-xs text-green-600 ml-2">· {verifiedStaff.campus}</span>
                 )}
               </div>
             </div>

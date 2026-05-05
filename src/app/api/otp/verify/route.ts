@@ -1,12 +1,15 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitize, isValidEmail, normalizeWorkEmail, apiError, apiOk } from '@/lib/auth'
+import { getActiveOrgCampuses } from '@/lib/org-campuses'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const email = normalizeWorkEmail(sanitize(body.email, 200))
     const code = sanitize(body.code, 6)
+    const campusRaw = sanitize(body.campus ?? '', 200)
+    const campus = campusRaw.trim() || null
 
     if (!email || !isValidEmail(email)) return apiError('Valid email is required')
     if (!code || !/^\d{6}$/.test(code)) return apiError('Invalid code format')
@@ -48,21 +51,44 @@ export async function POST(request: NextRequest) {
       staffQuery = staffQuery.eq('organization_id', orgId)
     }
 
-    const { data: staffMembers } = await staffQuery
+    const { data: staffMembersRaw } = await staffQuery
 
     // Get org info
     let orgInfo = null
+    let orgSlug: string | null = null
     if (orgId) {
       const { data: org } = await db
         .from('organizations')
-        .select('id, name')
+        .select('id, name, slug')
         .eq('id', orgId)
         .eq('status', 'approved')
         .single()
       orgInfo = org
+      orgSlug = org?.slug ?? null
     }
 
-    const staffList = (staffMembers ?? []).map((s) => ({
+    let staffMembers = staffMembersRaw ?? []
+
+    if (orgId && orgSlug !== 'demo') {
+      const orgCampuses = await getActiveOrgCampuses(db, orgId)
+      if (orgCampuses.length > 1 && !campus) {
+        return apiError('Please select the school or campus where you work.', 400)
+      }
+      if (campus) {
+        staffMembers = staffMembers.filter((s) => s.campus === campus)
+      }
+    }
+
+    if (!staffMembers.length) {
+      if (orgId) {
+        return apiError(
+          'No matching staff record for this email at the selected campus. Request a new code and verify your school selection.',
+          401,
+        )
+      }
+    }
+
+    const staffList = staffMembers.map((s) => ({
       id: s.id,
       full_name: s.full_name,
       position: s.position,
