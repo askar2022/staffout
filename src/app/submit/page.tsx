@@ -207,6 +207,7 @@ function SubmitForm() {
   // PTO balance
   const [ptoInfo, setPtoInfo] = useState<{ balance: number | null; used: number; remaining: number | null; settings?: Record<string, number> } | null>(null)
   const [submittedPtoDeducted, setSubmittedPtoDeducted] = useState<number | null>(null)
+  const [submittedPtoRequested, setSubmittedPtoRequested] = useState<number | null>(null)
   const [requestedPayType, setRequestedPayType] = useState<'pto' | 'unpaid'>('pto')
   const [submittedPayType, setSubmittedPayType] = useState<'pto' | 'unpaid' | null>(null)
   const [submittedApprovalStatus, setSubmittedApprovalStatus] = useState<'pending' | 'approved' | 'denied' | null>(null)
@@ -218,9 +219,9 @@ function SubmitForm() {
   const requiresLessonPlan = !!verifiedStaff?.position?.toLowerCase().includes('teacher') && status === 'absent'
 
   const noPtoLeft = (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
-  const effectiveRequestedPayType = noPtoLeft ? 'unpaid' : requestedPayType
+  const ptoBalanceKnown = ptoInfo?.remaining !== null && ptoInfo?.remaining !== undefined
   const projectedPtoHours = (() => {
-    if (effectiveRequestedPayType !== 'pto' || !status) return 0
+    if (!status) return 0
     if (status === 'late') {
       return calculateTimedPtoHours({ status: 'late', expectedArrival }) ?? 0
     }
@@ -245,6 +246,12 @@ function SubmitForm() {
   const projectedRemaining = ptoInfo?.remaining !== null && ptoInfo?.remaining !== undefined
     ? (ptoInfo.remaining ?? 0) - projectedPtoHours
     : null
+  const requestExceedsPto =
+    ptoBalanceKnown &&
+    projectedPtoHours > 0 &&
+    (projectedRemaining ?? 0) < 0
+  const forceUnpaid = noPtoLeft || requestExceedsPto
+  const effectiveRequestedPayType = forceUnpaid ? 'unpaid' : requestedPayType
 
   function buildPtoUrl(staffId: string, orgId: string) {
     const cleanEmail = email.trim().toLowerCase()
@@ -364,6 +371,10 @@ function SubmitForm() {
       setSubmitError('Lesson plan is required for teacher absences before you can submit.')
       return
     }
+    if (status === 'absent' && isMultiDay && !endDate) {
+      setSubmitError('Please choose the last day of your multi-day absence.')
+      return
+    }
 
     setSubmitting(true)
     setSubmitError('')
@@ -398,6 +409,7 @@ function SubmitForm() {
       setSubmitError(data.error || 'Something went wrong. Please try again.')
     } else {
       setSubmittedPtoDeducted(data.pto_hours_deducted ?? null)
+      setSubmittedPtoRequested(data.pto_hours_requested ?? null)
       setSubmittedPayType(data.pay_type ?? null)
       setSubmittedApprovalStatus(data.approval_status ?? null)
       setAutoSwitchedToUnpaid(data.auto_switched_to_unpaid === true)
@@ -465,14 +477,19 @@ function SubmitForm() {
           <p className="mt-2 text-xs text-slate-500">
             After your supervisor approves or denies this request, you will receive an email update. Please review your PTO portal for the latest balance.
           </p>
-          {submittedPayType === 'pto' && projectedPtoHours > 0 && projectedRemaining !== null && (
+          {submittedPtoRequested !== null && submittedPtoRequested > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              PTO requested for supervisor review: {formatPtoHours(submittedPtoRequested)}.
+            </p>
+          )}
+          {submittedPayType === 'pto' && submittedPtoRequested !== null && submittedPtoRequested > 0 && projectedRemaining !== null && (
             <p className="mt-2 text-xs text-slate-500">
               Estimated PTO left if approved for this request: {formatPtoHours(projectedRemaining)}
             </p>
           )}
           {autoSwitchedToUnpaid && (
             <p className="mt-2 text-xs text-red-600">
-              No PTO was available for this request, so it was automatically submitted as unpaid.
+              Not enough PTO was available for this request, so it was automatically submitted as unpaid.
             </p>
           )}
           {submittedPtoDeducted !== null && submittedPtoDeducted > 0 && (
@@ -498,6 +515,7 @@ function SubmitForm() {
               setLessonPlanUrl(null)
               setPtoInfo(null)
               setSubmittedPtoDeducted(null)
+              setSubmittedPtoRequested(null)
               setRequestedPayType('pto')
               setSubmittedPayType(null)
               setSubmittedApprovalStatus(null)
@@ -852,7 +870,7 @@ function SubmitForm() {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Use for this request</label>
                   <div className="grid grid-cols-1 gap-2">
                     {(['pto', 'unpaid'] as const).map((value) => {
-                      const noPtoLeft = value === 'pto' && (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
+                      const ptoUnavailable = value === 'pto' && forceUnpaid
                       return (
                         <label
                           key={value}
@@ -860,14 +878,14 @@ function SubmitForm() {
                             effectiveRequestedPayType === value
                               ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
                               : 'border-slate-200 bg-white'
-                          } ${noPtoLeft ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
+                          } ${ptoUnavailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
                         >
                           <input
                             type="radio"
                             name="requested_pay_type"
                             value={value}
                             checked={effectiveRequestedPayType === value}
-                            disabled={noPtoLeft}
+                            disabled={ptoUnavailable}
                             onChange={() => setRequestedPayType(value)}
                             className="hidden"
                           />
@@ -888,8 +906,22 @@ function SubmitForm() {
                       )
                     })}
                   </div>
-                  {(ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0 && (
-                    <p className="mt-2 text-xs text-red-600">No PTO is available, so this request must be unpaid.</p>
+                  {projectedPtoHours > 0 && (
+                    <p className={`mt-2 text-xs ${forceUnpaid ? 'text-red-600' : 'text-slate-500'}`}>
+                      {forceUnpaid
+                        ? `This request needs ${formatPtoHours(projectedPtoHours)} PTO, which is more than available.`
+                        : effectiveRequestedPayType === 'pto'
+                        ? `This request uses ${formatPtoHours(projectedPtoHours)} PTO if approved.`
+                        : 'You selected unpaid; no PTO will be requested.'}
+                      {!forceUnpaid && effectiveRequestedPayType === 'pto' && projectedRemaining !== null && (
+                        <> PTO left after approval: {formatPtoHours(projectedRemaining)}.</>
+                      )}
+                    </p>
+                  )}
+                  {forceUnpaid && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Not enough PTO is available for this request, so it must be unpaid.
+                    </p>
                   )}
                 </div>
 
@@ -954,6 +986,7 @@ function SubmitForm() {
                           type="date"
                           value={endDate}
                           min={new Date().toISOString().split('T')[0]}
+                          required
                           onChange={(e) => setEndDate(e.target.value)}
                           className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
@@ -1385,7 +1418,7 @@ function SubmitForm() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Use for this request</label>
                 <div className="grid grid-cols-1 gap-2">
                   {(['pto', 'unpaid'] as const).map((value) => {
-                    const noPtoLeft = value === 'pto' && (ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0
+                    const ptoUnavailable = value === 'pto' && forceUnpaid
                     return (
                       <label
                         key={value}
@@ -1393,14 +1426,14 @@ function SubmitForm() {
                           effectiveRequestedPayType === value
                             ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
                             : 'border-slate-200 bg-white'
-                        } ${noPtoLeft ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
+                        } ${ptoUnavailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-slate-300'}`}
                       >
                         <input
                           type="radio"
                           name="requested_pay_type"
                           value={value}
                           checked={effectiveRequestedPayType === value}
-                          disabled={noPtoLeft}
+                          disabled={ptoUnavailable}
                           onChange={() => setRequestedPayType(value)}
                           className="hidden"
                         />
@@ -1421,8 +1454,22 @@ function SubmitForm() {
                     )
                   })}
                 </div>
-                {(ptoInfo?.remaining ?? null) !== null && (ptoInfo?.remaining ?? 0) <= 0 && (
-                  <p className="mt-2 text-xs text-red-600">No PTO is available, so this request must be unpaid.</p>
+                {projectedPtoHours > 0 && (
+                  <p className={`mt-2 text-xs ${forceUnpaid ? 'text-red-600' : 'text-slate-500'}`}>
+                    {forceUnpaid
+                      ? `This request needs ${formatPtoHours(projectedPtoHours)} PTO, which is more than available.`
+                      : effectiveRequestedPayType === 'pto'
+                      ? `This request uses ${formatPtoHours(projectedPtoHours)} PTO if approved.`
+                      : 'You selected unpaid; no PTO will be requested.'}
+                    {!forceUnpaid && effectiveRequestedPayType === 'pto' && projectedRemaining !== null && (
+                      <> PTO left after approval: {formatPtoHours(projectedRemaining)}.</>
+                    )}
+                  </p>
+                )}
+                {forceUnpaid && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Not enough PTO is available for this request, so it must be unpaid.
+                  </p>
                 )}
               </div>
 
@@ -1478,6 +1525,7 @@ function SubmitForm() {
                         type="date"
                         value={endDate}
                         min={new Date().toISOString().split('T')[0]}
+                        required
                         onChange={(e) => setEndDate(e.target.value)}
                         className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />

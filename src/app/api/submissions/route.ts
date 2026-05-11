@@ -331,6 +331,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         id: submission.id,
+        pto_hours_requested: ptoHoursRequested,
         pto_hours_deducted: null,
         pay_type: payResolution.payType,
         approval_status: 'pending',
